@@ -747,7 +747,7 @@
     /* ── Compass ── */
     function setCompass(deg){
         if(deg===null||isNaN(deg)) return;
-        document.getElementById("compassGroup").style.transform=`rotate(${deg}deg)`;
+        document.getElementById("compassGroup").style.transform=`rotate(${deg+180}deg)`;
     }
 
     /* ════════════════════════════════════════════════════════════════
