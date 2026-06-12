@@ -39,11 +39,6 @@
             font-weight: 700;
         }
         
-        canvas {
-            width: 100% !important;
-            height: 110px !important;
-        }
-        
         .tab-active {
             background: linear-gradient(90deg, #00d4ff, #0099ff);
             color: white;
@@ -64,7 +59,7 @@
             </div>
             <div>
                 <h1 class="text-xl font-semibold tracking-tight">Solar + AC Dashboard</h1>
-                <p class="text-xs text-emerald-400 font-medium">LIVE • CURAÇAO</p>
+                <p class="text-xs text-emerald-400 font-medium">LIVE • CURAÇAO • TODAY 4.8 kWh</p>
             </div>
         </div>
         
@@ -103,7 +98,7 @@
                 <div class="flex items-center gap-6">
                     <div id="weatherIcon" class="weather-icon">⛅</div>
                     <div>
-                        <div id="feelsLikeBig" class="value text-3xl">40.8 °C</div>
+                        <div id="feelsLikeBig" class="value text-3xl">31.4 °C</div>
                         <div class="text-xs text-white/60 -mt-1">Feels like</div>
                         <div id="weatherDesc" class="text-sm text-white/70 mt-2">Partly cloudy</div>
                     </div>
@@ -129,10 +124,6 @@
                         <span class="text-white/70">Today</span>
                         <span id="dailySolar" class="font-semibold text-emerald-400">4.8 kWh</span>
                     </div>
-                </div>
-                
-                <div class="mt-6">
-                    <canvas id="solarChart"></canvas>
                 </div>
             </div>
 
@@ -173,7 +164,7 @@
                 <div class="mt-6 bg-white/5 rounded-2xl p-4">
                     <div class="flex justify-between text-xs mb-2">
                         <span>OUTDOOR FEELS LIKE</span>
-                        <span id="outdoor">40.8 °C</span>
+                        <span id="outdoor">31.4 °C</span>
                     </div>
                 </div>
             </div>
@@ -235,28 +226,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- History Chart -->
-        <div class="mt-6 card rounded-3xl p-4 border border-white/10">
-            <div class="flex justify-between items-center mb-4">
-                <div class="font-semibold">Power Flow (Last 15 min)</div>
-                <div class="flex gap-6 text-xs">
-                    <div class="flex items-center gap-2">
-                        <div class="w-3 h-0.5 bg-emerald-400"></div>
-                        <span>Solar</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-3 h-0.5 bg-cyan-400"></div>
-                        <span>AC</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-3 h-0.5 bg-white"></div>
-                        <span>Grid</span>
-                    </div>
-                </div>
-            </div>
-            <canvas id="historyChart" height="110"></canvas>
-        </div>
     </div>
 
     <div class="text-center text-xs text-white/40 mt-6">
@@ -269,12 +238,11 @@
         const SETPOINT = 28;
         const MAX_SOLAR = 920;
         const TARGET_DAILY_SOLAR = 4.8;
-        const API_KEY = "fef2a58ed5fa4b2ea08221244260405"; // Working key
+        const API_KEY = "fef2a58ed5fa4b2ea08221244260405";
 
         let acMode = true;
-        let indoor = 28.4;
-        let dailySolarKwh = 3.2;
-        let history = { solar: [], ac: [], grid: [] };
+        let indoor = 27.9;
+        let dailySolarKwh = 4.2; // Starting close to target
         let currentWeatherData = null;
 
         // ---------------- TIME ----------------
@@ -309,14 +277,12 @@
                 
                 const cond = data.current.condition.text;
                 const feels = data.current.feelslike_c;
-                const iconUrl = data.current.condition.icon;
                 
                 document.getElementById("weatherCondition").innerText = cond.toUpperCase();
                 document.getElementById("feelsLikeBig").innerText = feels.toFixed(1) + " °C";
                 document.getElementById("weatherDesc").innerText = cond;
                 document.getElementById("outdoor").innerText = feels.toFixed(1) + " °C";
                 
-                // Use emoji fallback or image
                 const emojiMap = {
                     "sunny": "☀️", "clear": "☀️", "partly cloudy": "⛅", "cloudy": "☁️", "overcast": "☁️"
                 };
@@ -329,7 +295,7 @@
             }
         }
 
-        // ---------------- SOLAR MODEL (cloud adjusted) ----------------
+        // ---------------- SOLAR MODEL ----------------
         function getSolarOutput(baseIntensity) {
             if (!currentWeatherData) return Math.floor(baseIntensity * 0.85);
             const cloud = currentWeatherData.current.cloud || 50;
@@ -345,7 +311,7 @@
             return getSolarOutput(base);
         }
 
-        // ---------------- OUTDOOR / AC / THERMAL (unchanged logic) ----------------
+        // ---------------- OUTDOOR / AC / THERMAL ----------------
         function outdoorFeelsLike() {
             return currentWeatherData ? currentWeatherData.current.feelslike_c : 31.5 + Math.sin(Date.now() / 1800000) * 3.2;
         }
@@ -375,32 +341,6 @@
             return kwh * RATE;
         }
 
-        // ---------------- CHARTS ----------------
-        let solarCtx, historyCtx;
-        function initCharts() {
-            solarCtx = document.getElementById('solarChart').getContext('2d');
-            historyCtx = document.getElementById('historyChart').getContext('2d');
-        }
-        
-        function drawSimpleSpark(ctx, values, color) {
-            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3.5;
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = color;
-            ctx.beginPath();
-            const maxVal = Math.max(...values);
-            const minVal = Math.min(...values) || 0;
-            const range = maxVal - minVal || 1;
-            for (let i = 0; i < values.length; i++) {
-                const x = (i / (values.length - 1)) * ctx.canvas.width;
-                const y = ctx.canvas.height - ((values[i] - minVal) / range) * (ctx.canvas.height * 0.85);
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-        }
-
         // ---------------- MAIN UPDATE ----------------
         function update() {
             const out = outdoorFeelsLike();
@@ -413,14 +353,15 @@
             const importW = Math.max(0, -net);
             const exportW = Math.max(0, net);
             
+            // Accumulate solar (slowly approach 4.8 kWh)
             const secondsPerTick = 1.2;
             dailySolarKwh += (sol / 1000) * (secondsPerTick / 3600);
-            if (dailySolarKwh > TARGET_DAILY_SOLAR + 0.4) dailySolarKwh = TARGET_DAILY_SOLAR + 0.15;
+            if (dailySolarKwh > TARGET_DAILY_SOLAR) dailySolarKwh = TARGET_DAILY_SOLAR;
             
             const dailyCost = calcDailyCost(importW - exportW);
             const monthlyCost = dailyCost * 30;
             
-            // UI
+            // UI Updates
             document.getElementById("solar").innerText = sol.toFixed(0) + " W";
             document.getElementById("dailySolar").innerText = dailySolarKwh.toFixed(1) + " kWh";
             document.getElementById("ac").innerText = ac.toFixed(0) + " W";
@@ -443,17 +384,6 @@
             
             const acPercent = Math.min(100, Math.round((ac / 1280) * 100));
             document.getElementById("acBar").style.width = acPercent + "%";
-            
-            // History
-            history.solar.push(sol);
-            history.ac.push(ac);
-            history.grid.push(net);
-            if (history.solar.length > 30) {
-                history.solar.shift(); history.ac.shift(); history.grid.shift();
-            }
-            
-            if (historyCtx) drawSimpleSpark(historyCtx, history.solar, '#10b981');
-            if (solarCtx) drawSimpleSpark(solarCtx, history.solar.slice(-12), '#34d399');
         }
 
         // ---------------- START ----------------
@@ -462,19 +392,11 @@
             updateClock();
             setInterval(updateClock, 1000);
             
-            await fetchWeather(); // Initial real weather
-            setInterval(fetchWeather, 300000); // Refresh every 5 minutes
+            await fetchWeather();
+            setInterval(fetchWeather, 300000); // Refresh weather every 5 min
             
-            initCharts();
             update();
             setInterval(update, 1200);
-            
-            // Initial history
-            for (let i = 0; i < 25; i++) {
-                history.solar.push(420 + Math.random() * 380);
-                history.ac.push(520 + Math.random() * 280);
-                history.grid.push(-80 + Math.random() * 220);
-            }
         }
 
         window.onload = initialize;
