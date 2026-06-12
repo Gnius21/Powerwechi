@@ -351,8 +351,8 @@
         const RATE = 0.68;                 // XCG per kWh
         const MAX_SOLAR = 920;             // W peak of the panels
         const MAX_AC = 1280;               // W max AC draw
-        const FRIDGE_RUN_W = 90;           // W small fridge compressor running
-        const FRIDGE_IDLE_W = 12;          // W small fridge between cycles
+        const FRIDGE_RUN_W = 150;          // W small fridge compressor running
+        const FRIDGE_IDLE_W = 45;          // W small fridge between cycles (fans, standby)
         const FRIDGE_DUTY = 0.35;          // compressor runs ~35% of the time
         const OTHER_BASE_W = 42;           // lights / wifi / standby
         const API_KEY = "fef2a58ed5fa4b2ea08221244260405";
@@ -370,8 +370,8 @@
         let dailySolarKwh = 0;
         let dailyAcKwh = 0;
         let currentWeatherData = null;
-        let manualSolarW = null;           // user's reading from the inverter
-        let manualSolarTime = null;
+        let manualSolarW = 500;            // W — user's reading from the inverter (starts at 500 W)
+        let manualSolarTime = Date.now();
 
         // ---------------- PERSISTENCE ----------------
         function saveState() {
