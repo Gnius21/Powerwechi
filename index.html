@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Energy Dashboard - Curaçao</title>
+    <title>House Power Dashboard - Curaçao</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
+
         body {
             font-family: 'Inter', system-ui, sans-serif;
             background: linear-gradient(135deg, #0a0f1c 0%, #050814 100%);
@@ -17,37 +17,63 @@
             margin: 0;
             min-height: 100vh;
         }
-        
+
         .header {
             background: rgba(17, 26, 51, 0.95);
             backdrop-filter: blur(12px);
         }
-        
+
         .card {
             background: rgba(20, 28, 58, 0.85);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         }
-        
+
         .value {
             font-size: 1.75rem;
             line-height: 1;
             font-weight: 700;
         }
-        
+
         .tab-active {
             background: linear-gradient(90deg, #00d4ff, #0099ff);
             color: white;
             box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
         }
-        
+
+        .temp-active {
+            background: linear-gradient(90deg, #34d399, #06b6d4);
+            color: #04121f;
+            box-shadow: 0 0 12px rgba(52, 211, 153, 0.5);
+        }
+
         .weather-icon {
             font-size: 2.8rem;
             filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.3));
+        }
+
+        .solar-input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .solar-input:focus {
+            outline: none;
+            border-color: #34d399;
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .pulse-dot {
+            animation: pulse-dot 1.5s ease-in-out infinite;
         }
     </style>
 </head>
@@ -58,11 +84,11 @@
                 ⚡
             </div>
             <div>
-                <h1 class="text-xl font-semibold tracking-tight">Solar + AC Dashboard</h1>
-                <p class="text-xs text-emerald-400 font-medium">LIVE • CURAÇAO • TODAY 4.8 kWh</p>
+                <h1 class="text-xl font-semibold tracking-tight">House Power Dashboard</h1>
+                <p class="text-xs text-emerald-400 font-medium">LIVE • CURAÇAO • <span id="headerSolarKwh">SOLAR TODAY 0.0 kWh</span></p>
             </div>
         </div>
-        
+
         <div class="text-right">
             <div id="currentTime" class="text-sm font-mono text-white/70"></div>
             <div id="currentDate" class="text-xs text-white/50"></div>
@@ -70,27 +96,36 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-4 py-4">
-        <!-- Mode Toggle -->
-        <div class="flex justify-center mb-6">
+        <!-- AC Controls: ON/OFF + temperature choice -->
+        <div class="flex flex-wrap justify-center items-center gap-4 mb-6">
             <div class="inline-flex bg-white/5 backdrop-blur-xl rounded-3xl p-1 shadow-xl border border-white/10">
-                <button id="onBtn" 
+                <button id="onBtn"
                         onclick="setMode(true)"
                         class="tab-active px-6 py-3 rounded-3xl flex items-center gap-3 text-base font-semibold transition-all">
                     <i class="fas fa-snowflake"></i>
-                    <span>AC ON • 28°C</span>
+                    <span>AC ON</span>
                 </button>
-                <button id="offBtn" 
+                <button id="offBtn"
                         onclick="setMode(false)"
                         class="px-6 py-3 rounded-3xl flex items-center gap-3 text-base font-semibold transition-all">
                     <i class="fas fa-power-off text-red-400"></i>
                     <span>AC OFF</span>
                 </button>
             </div>
+
+            <div id="tempPicker" class="inline-flex bg-white/5 backdrop-blur-xl rounded-3xl p-1 shadow-xl border border-white/10">
+                <button id="temp26" onclick="setSetpoint(26)"
+                        class="px-5 py-3 rounded-3xl text-base font-semibold transition-all">26°C</button>
+                <button id="temp27" onclick="setSetpoint(27)"
+                        class="px-5 py-3 rounded-3xl text-base font-semibold transition-all">27°C</button>
+                <button id="temp28" onclick="setSetpoint(28)"
+                        class="temp-active px-5 py-3 rounded-3xl text-base font-semibold transition-all">28°C</button>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Weather -->
-            <div class="card rounded-3xl p-4 border border-white/10 lg:col-span-1">
+            <div class="card rounded-3xl p-4 border border-white/10">
                 <div class="flex items-center justify-between mb-3">
                     <div class="text-lg font-semibold">Curaçao</div>
                     <div id="weatherCondition" class="text-xs uppercase tracking-widest font-medium text-sky-400">PARTLY CLOUDY</div>
@@ -105,45 +140,43 @@
                 </div>
             </div>
 
-            <!-- Solar -->
-            <div class="card rounded-3xl p-4 border border-white/10">
+            <!-- Solar with manual update -->
+            <div class="card rounded-3xl p-4 border border-white/10 lg:col-span-2">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-3">
                         <div class="text-4xl">🌞</div>
                         <div>
                             <div class="text-lg font-semibold">Solar PV</div>
-                            <div class="text-xs text-emerald-400">Production</div>
+                            <div id="solarSource" class="text-xs text-emerald-400">Estimated (sun + clouds)</div>
                         </div>
                     </div>
+                    <div id="solar" class="value text-emerald-400">0 W</div>
                 </div>
-                <div id="solar" class="value text-emerald-400">742 W</div>
-                <div class="text-xs text-white/60 mt-1">Peak capacity: 920 W</div>
-                
-                <div class="mt-4 pt-4 border-t border-white/10">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-white/70">Today</span>
-                        <span id="dailySolar" class="font-semibold text-emerald-400">4.8 kWh</span>
-                    </div>
-                </div>
-            </div>
 
-            <!-- AC Load -->
-            <div class="card rounded-3xl p-4 border border-white/10">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-3">
-                        <div class="text-4xl">❄️</div>
-                        <div>
-                            <div class="text-lg font-semibold">AC Load</div>
-                            <div class="text-xs text-cyan-400">Air Conditioning</div>
-                        </div>
+                <div class="bg-white/5 rounded-2xl p-3 mt-2">
+                    <div class="text-xs text-white/60 mb-2 flex items-center gap-2">
+                        <i class="fas fa-pen-to-square text-emerald-400"></i>
+                        UPDATE FROM YOUR SOLAR INVERTER
                     </div>
+                    <div class="flex flex-wrap gap-2">
+                        <input id="solarManualInput" type="number" min="0" max="20000" step="1"
+                               placeholder="Current watts e.g. 740"
+                               class="solar-input rounded-xl px-3 py-2 text-sm text-white flex-1 min-w-[140px]">
+                        <button onclick="applyManualSolar()"
+                                class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-900 text-sm font-semibold hover:opacity-90 transition-all">
+                            <i class="fas fa-check mr-1"></i>Update
+                        </button>
+                        <button onclick="clearManualSolar()"
+                                class="px-4 py-2 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/20 transition-all">
+                            <i class="fas fa-rotate mr-1"></i>Auto
+                        </button>
+                    </div>
+                    <div id="solarManualInfo" class="text-xs text-white/50 mt-2">No manual reading set — using sun position &amp; cloud estimate.</div>
                 </div>
-                <div id="ac" class="value text-cyan-400">685 W</div>
-                <div class="flex items-center gap-2 mt-3">
-                    <div class="h-2.5 flex-1 bg-white/10 rounded-full overflow-hidden">
-                        <div id="acBar" class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 w-[62%] rounded-full"></div>
-                    </div>
-                    <span class="text-xs font-mono text-white/70">62%</span>
+
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-between text-sm">
+                    <span class="text-white/70">Produced today</span>
+                    <span id="dailySolar" class="font-semibold text-emerald-400">0.0 kWh</span>
                 </div>
             </div>
 
@@ -159,13 +192,96 @@
                     </div>
                 </div>
                 <div id="indoor" class="value text-amber-400">27.8 °C</div>
-                <div class="text-xs text-white/60 mt-1">Setpoint: 28.0 °C</div>
-                
+                <div id="setpointLabel" class="text-xs text-white/60 mt-1">Setpoint: 28.0 °C</div>
+
                 <div class="mt-6 bg-white/5 rounded-2xl p-4">
                     <div class="flex justify-between text-xs mb-2">
                         <span>OUTDOOR FEELS LIKE</span>
                         <span id="outdoor">31.4 °C</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- AC Load -->
+            <div class="card rounded-3xl p-4 border border-white/10">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-4xl">❄️</div>
+                        <div>
+                            <div class="text-lg font-semibold">AC Load</div>
+                            <div id="acModeLabel" class="text-xs text-cyan-400">ON • 28°C</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="ac" class="value text-cyan-400">0 W</div>
+                <div class="flex items-center gap-2 mt-3">
+                    <div class="h-2.5 flex-1 bg-white/10 rounded-full overflow-hidden">
+                        <div id="acBar" class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 w-0 rounded-full"></div>
+                    </div>
+                    <span id="acPct" class="text-xs font-mono text-white/70">0%</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-between text-sm">
+                    <span class="text-white/70">Est. today</span>
+                    <span id="acDaily" class="font-semibold text-cyan-400">0.0 kWh</span>
+                </div>
+            </div>
+
+            <!-- Fridge: 24h always on -->
+            <div class="card rounded-3xl p-4 border border-white/10">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-4xl">🧊</div>
+                        <div>
+                            <div class="text-lg font-semibold">Small Fridge</div>
+                            <div class="text-xs text-blue-300 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot inline-block"></span>
+                                ALWAYS ON • 24H
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="fridge" class="value text-blue-300">0 W</div>
+                <div id="fridgeState" class="text-xs text-white/60 mt-1">Compressor running</div>
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-between text-sm">
+                    <span class="text-white/70">~ per day</span>
+                    <span id="fridgeDaily" class="font-semibold text-blue-300">1.4 kWh</span>
+                </div>
+            </div>
+
+            <!-- Other / base load -->
+            <div class="card rounded-3xl p-4 border border-white/10">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-4xl">💡</div>
+                        <div>
+                            <div class="text-lg font-semibold">Other Loads</div>
+                            <div class="text-xs text-white/60">Lights • WiFi • Standby</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="other" class="value text-white/80">0 W</div>
+                <div class="mt-3 pt-3 border-t border-white/10 flex justify-between text-sm">
+                    <span class="text-white/70">~ per day</span>
+                    <span id="otherDaily" class="font-semibold text-white/80">1.0 kWh</span>
+                </div>
+            </div>
+
+            <!-- Total house load -->
+            <div class="card rounded-3xl p-4 border border-white/10">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-4xl">🏠</div>
+                        <div>
+                            <div class="text-lg font-semibold">House Total</div>
+                            <div class="text-xs text-orange-300">All loads combined</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="houseTotal" class="value text-orange-300">0 W</div>
+                <div class="mt-3 space-y-1.5 text-xs">
+                    <div class="flex justify-between"><span class="text-cyan-400">❄️ AC</span><span id="bdAc" class="font-mono">0 W</span></div>
+                    <div class="flex justify-between"><span class="text-blue-300">🧊 Fridge</span><span id="bdFridge" class="font-mono">0 W</span></div>
+                    <div class="flex justify-between"><span class="text-white/70">💡 Other</span><span id="bdOther" class="font-mono">0 W</span></div>
                 </div>
             </div>
 
@@ -176,20 +292,20 @@
                         <div class="text-4xl">🔌</div>
                         <div>
                             <div class="text-lg font-semibold">Grid Net</div>
-                            <div id="status" class="text-xs font-medium">EXPORTING • +87 W</div>
+                            <div id="status" class="text-xs font-medium">—</div>
                         </div>
                     </div>
-                    <div id="grid" class="value text-emerald-400">+87 W</div>
+                    <div id="grid" class="value text-emerald-400">0 W</div>
                 </div>
-                
+
                 <div class="flex gap-4 text-center text-xs mt-6">
                     <div class="flex-1 bg-emerald-900/30 rounded-2xl py-3">
                         <div class="text-emerald-400">Export</div>
-                        <div id="export" class="font-mono text-lg font-semibold">142 W</div>
+                        <div id="export" class="font-mono text-lg font-semibold">0 W</div>
                     </div>
                     <div class="flex-1 bg-red-900/30 rounded-2xl py-3">
                         <div class="text-red-400">Import</div>
-                        <div id="import" class="font-mono text-lg font-semibold">55 W</div>
+                        <div id="import" class="font-mono text-lg font-semibold">0 W</div>
                     </div>
                 </div>
             </div>
@@ -205,10 +321,8 @@
                         </div>
                     </div>
                 </div>
-                <div id="daily" class="value text-yellow-400">-1.24 XCG</div>
-                <div class="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                    <i class="fas fa-arrow-down"></i> SAVING 42%
-                </div>
+                <div id="daily" class="value text-yellow-400">0.00 XCG</div>
+                <div id="dailyTrend" class="text-xs text-emerald-400 mt-1 flex items-center gap-1"></div>
             </div>
 
             <!-- Monthly -->
@@ -219,31 +333,73 @@
                         <div class="text-xs text-white/60">30-day projection</div>
                     </div>
                 </div>
-                <div id="monthly" class="value text-purple-400">87.6 XCG</div>
+                <div id="monthly" class="value text-purple-400">0.0 XCG</div>
                 <div class="mt-6 flex items-center gap-2 text-xs">
-                    <div class="px-3 py-1 bg-white/10 rounded-full">EST. SAVINGS</div>
-                    <div id="savings" class="font-semibold text-emerald-400">214 XCG</div>
+                    <div class="px-3 py-1 bg-white/10 rounded-full">VS AC AT 26°C</div>
+                    <div id="savings" class="font-semibold text-emerald-400">0 XCG saved</div>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="text-center text-xs text-white/40 mt-6">
-        Real weather from WeatherAPI • Solar adjusted by cloud cover
+        Real weather from WeatherAPI • Solar from your manual reading or estimated by cloud cover
     </div>
 
     <script>
         // ---------------- SETTINGS ----------------
-        const RATE = 0.68;
-        const SETPOINT = 28;
-        const MAX_SOLAR = 920;
-        const TARGET_DAILY_SOLAR = 4.8;
+        const RATE = 0.68;                 // XCG per kWh
+        const MAX_SOLAR = 920;             // W peak of the panels
+        const MAX_AC = 1280;               // W max AC draw
+        const FRIDGE_RUN_W = 90;           // W small fridge compressor running
+        const FRIDGE_IDLE_W = 12;          // W small fridge between cycles
+        const FRIDGE_DUTY = 0.35;          // compressor runs ~35% of the time
+        const OTHER_BASE_W = 42;           // lights / wifi / standby
         const API_KEY = "fef2a58ed5fa4b2ea08221244260405";
 
+        // AC behaves differently per setpoint: lower = colder = more power.
+        const AC_PROFILES = {
+            26: { base: 560, dailyKwh: 7.4 },
+            27: { base: 480, dailyKwh: 6.1 },
+            28: { base: 420, dailyKwh: 5.0 }
+        };
+
         let acMode = true;
+        let setpoint = 28;
         let indoor = 27.9;
-        let dailySolarKwh = 4.2; // Starting close to target
+        let dailySolarKwh = 0;
+        let dailyAcKwh = 0;
         let currentWeatherData = null;
+        let manualSolarW = null;           // user's reading from the inverter
+        let manualSolarTime = null;
+
+        // ---------------- PERSISTENCE ----------------
+        function saveState() {
+            try {
+                localStorage.setItem("powerDash", JSON.stringify({
+                    acMode, setpoint,
+                    manualSolarW, manualSolarTime,
+                    dailySolarKwh, dailyAcKwh,
+                    day: new Date().toDateString()
+                }));
+            } catch (e) {}
+        }
+
+        function loadState() {
+            try {
+                const s = JSON.parse(localStorage.getItem("powerDash"));
+                if (!s) return;
+                acMode = s.acMode !== false;
+                setpoint = [26, 27, 28].includes(s.setpoint) ? s.setpoint : 28;
+                // Daily counters reset on a new day
+                if (s.day === new Date().toDateString()) {
+                    dailySolarKwh = s.dailySolarKwh || 0;
+                    dailyAcKwh = s.dailyAcKwh || 0;
+                    manualSolarW = (typeof s.manualSolarW === "number") ? s.manualSolarW : null;
+                    manualSolarTime = s.manualSolarTime || null;
+                }
+            } catch (e) {}
+        }
 
         // ---------------- TIME ----------------
         function updateClock() {
@@ -254,7 +410,7 @@
             document.getElementById("currentDate").innerText = dateStr;
         }
 
-        // ---------------- MODE ----------------
+        // ---------------- AC MODE + SETPOINT ----------------
         function setMode(v) {
             acMode = v;
             const onBtn = document.getElementById("onBtn");
@@ -266,6 +422,64 @@
                 onBtn.classList.remove("tab-active");
                 offBtn.classList.add("tab-active");
             }
+            document.getElementById("tempPicker").style.opacity = v ? "1" : "0.35";
+            document.getElementById("tempPicker").style.pointerEvents = v ? "auto" : "none";
+            updateAcLabels();
+            saveState();
+            update();
+        }
+
+        function setSetpoint(t) {
+            setpoint = t;
+            [26, 27, 28].forEach(d => {
+                document.getElementById("temp" + d).classList.toggle("temp-active", d === t);
+            });
+            updateAcLabels();
+            saveState();
+            update();
+        }
+
+        function updateAcLabels() {
+            document.getElementById("acModeLabel").innerText = acMode ? `ON • ${setpoint}°C` : "OFF";
+            document.getElementById("setpointLabel").innerText = acMode
+                ? `Setpoint: ${setpoint.toFixed(1)} °C`
+                : "AC off — no setpoint";
+        }
+
+        // ---------------- MANUAL SOLAR ----------------
+        function applyManualSolar() {
+            const el = document.getElementById("solarManualInput");
+            const v = parseFloat(el.value);
+            if (isNaN(v) || v < 0) {
+                el.classList.add("border-red-400");
+                setTimeout(() => el.classList.remove("border-red-400"), 1200);
+                return;
+            }
+            manualSolarW = Math.round(v);
+            manualSolarTime = Date.now();
+            el.value = "";
+            saveState();
+            update();
+        }
+
+        function clearManualSolar() {
+            manualSolarW = null;
+            manualSolarTime = null;
+            saveState();
+            update();
+        }
+
+        function updateSolarSourceUI() {
+            const src = document.getElementById("solarSource");
+            const info = document.getElementById("solarManualInfo");
+            if (manualSolarW !== null) {
+                const mins = Math.floor((Date.now() - manualSolarTime) / 60000);
+                src.innerText = "Manual reading from inverter";
+                info.innerHTML = `<span class="text-emerald-400">✓ Using your reading: ${manualSolarW} W</span> (set ${mins < 1 ? "just now" : mins + " min ago"}) — press Auto to go back to the estimate.`;
+            } else {
+                src.innerText = "Estimated (sun + clouds)";
+                info.innerText = "No manual reading set — using sun position & cloud estimate.";
+            }
         }
 
         // ---------------- FETCH REAL WEATHER ----------------
@@ -274,20 +488,20 @@
                 const response = await fetch(`https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=Curaçao`);
                 const data = await response.json();
                 currentWeatherData = data;
-                
+
                 const cond = data.current.condition.text;
                 const feels = data.current.feelslike_c;
-                
+
                 document.getElementById("weatherCondition").innerText = cond.toUpperCase();
                 document.getElementById("feelsLikeBig").innerText = feels.toFixed(1) + " °C";
                 document.getElementById("weatherDesc").innerText = cond;
                 document.getElementById("outdoor").innerText = feels.toFixed(1) + " °C";
-                
+
                 const emojiMap = {
                     "sunny": "☀️", "clear": "☀️", "partly cloudy": "⛅", "cloudy": "☁️", "overcast": "☁️"
                 };
                 document.getElementById("weatherIcon").innerText = emojiMap[cond.toLowerCase()] || "⛅";
-                
+
                 return data;
             } catch(e) {
                 console.error("Weather fetch failed", e);
@@ -296,49 +510,59 @@
         }
 
         // ---------------- SOLAR MODEL ----------------
-        function getSolarOutput(baseIntensity) {
-            if (!currentWeatherData) return Math.floor(baseIntensity * 0.85);
-            const cloud = currentWeatherData.current.cloud || 50;
-            const cloudFactor = Math.max(0.25, (100 - cloud) / 100);
-            return Math.floor(baseIntensity * cloudFactor);
-        }
-
-        function solar() {
+        function estimatedSolar() {
             const t = (Date.now() % 86400000) / 86400000;
             let intensity = Math.sin(t * Math.PI * 2 - Math.PI / 2);
             intensity = Math.max(0, intensity);
             const base = intensity * MAX_SOLAR * (0.88 + Math.random() * 0.08);
-            return getSolarOutput(base);
+            if (!currentWeatherData) return Math.floor(base * 0.85);
+            const cloud = currentWeatherData.current.cloud || 50;
+            const cloudFactor = Math.max(0.25, (100 - cloud) / 100);
+            return Math.floor(base * cloudFactor);
         }
 
-        // ---------------- OUTDOOR / AC / THERMAL ----------------
+        function solar() {
+            if (manualSolarW !== null) return manualSolarW;
+            return estimatedSolar();
+        }
+
+        // ---------------- LOADS ----------------
         function outdoorFeelsLike() {
             return currentWeatherData ? currentWeatherData.current.feelslike_c : 31.5 + Math.sin(Date.now() / 1800000) * 3.2;
         }
 
         function acPower(indoorTemp, outdoorTemp) {
-            if (!acMode) return 18;
+            if (!acMode) return 8; // standby
+            const profile = AC_PROFILES[setpoint];
             const tempDiff = outdoorTemp - indoorTemp;
-            const setpointDelta = indoorTemp - SETPOINT;
-            let baseLoad = 420;
-            let load = baseLoad + (tempDiff * 68) + (setpointDelta * 45);
-            if (Math.abs(outdoorTemp - SETPOINT) < 1.5 && Math.abs(setpointDelta) < 0.4) load = 265;
-            return Math.min(1280, Math.max(260, Math.floor(load)));
+            const setpointDelta = indoorTemp - setpoint;
+            let load = profile.base + (tempDiff * 68) + (setpointDelta * 45);
+            if (Math.abs(outdoorTemp - setpoint) < 1.5 && Math.abs(setpointDelta) < 0.4) load = profile.base * 0.6;
+            return Math.min(MAX_AC, Math.max(220, Math.floor(load)));
+        }
+
+        function fridgePower() {
+            // Compressor cycles: on for a stretch, then idle, around FRIDGE_DUTY
+            const cycle = (Date.now() % 1200000) / 1200000; // 20-min cycle
+            const running = cycle < FRIDGE_DUTY;
+            const w = running
+                ? FRIDGE_RUN_W + Math.floor(Math.random() * 8)
+                : FRIDGE_IDLE_W + Math.floor(Math.random() * 3);
+            return { w, running };
+        }
+
+        function otherPower() {
+            return OTHER_BASE_W + Math.floor(Math.random() * 10);
         }
 
         function updateIndoor(out, ac) {
             let heatGain = (out - indoor) * 0.032;
             let cooling = acMode ? (ac * 0.0034) : 0.8;
             indoor += heatGain - cooling;
-            if (acMode && indoor < SETPOINT) indoor = SETPOINT + Math.random() * 0.15;
+            if (acMode && indoor < setpoint) indoor = setpoint + Math.random() * 0.15;
             if (!acMode && indoor > 36) indoor = 36;
             if (indoor < 18) indoor = 18;
             if (indoor > 42) indoor = 42;
-        }
-
-        function calcDailyCost(netW) {
-            const kwh = (netW * 24) / 1000;
-            return kwh * RATE;
         }
 
         // ---------------- MAIN UPDATE ----------------
@@ -346,57 +570,98 @@
             const out = outdoorFeelsLike();
             const sol = solar();
             const ac = acPower(indoor, out);
-            
+            const fridge = fridgePower();
+            const other = otherPower();
+
             updateIndoor(out, ac);
-            
-            const net = sol - ac;
+
+            const houseTotal = ac + fridge.w + other;
+            const net = sol - houseTotal;
             const importW = Math.max(0, -net);
             const exportW = Math.max(0, net);
-            
-            // Accumulate solar (slowly approach 4.8 kWh)
+
+            // Accumulate energy counters
             const secondsPerTick = 1.2;
             dailySolarKwh += (sol / 1000) * (secondsPerTick / 3600);
-            if (dailySolarKwh > TARGET_DAILY_SOLAR) dailySolarKwh = TARGET_DAILY_SOLAR;
-            
-            const dailyCost = calcDailyCost(importW - exportW);
+            dailyAcKwh += (ac / 1000) * (secondsPerTick / 3600);
+
+            // Daily cost: what's used so far today minus solar, projected over the day
+            const fridgeDailyKwh = ((FRIDGE_RUN_W * FRIDGE_DUTY + FRIDGE_IDLE_W * (1 - FRIDGE_DUTY)) * 24) / 1000;
+            const otherDailyKwh = (OTHER_BASE_W * 24) / 1000;
+            const acDailyEst = acMode ? AC_PROFILES[setpoint].dailyKwh : 0.2;
+            const solarDailyEst = Math.max(dailySolarKwh, 3.5);
+            const netDailyKwh = acDailyEst + fridgeDailyKwh + otherDailyKwh - solarDailyEst;
+            const dailyCost = netDailyKwh * RATE;
             const monthlyCost = dailyCost * 30;
-            
+
+            // Savings vs running AC at 26°C all month
+            const worstDaily = (AC_PROFILES[26].dailyKwh + fridgeDailyKwh + otherDailyKwh - solarDailyEst) * RATE;
+            const savings = Math.max(0, (worstDaily - dailyCost) * 30);
+
             // UI Updates
             document.getElementById("solar").innerText = sol.toFixed(0) + " W";
             document.getElementById("dailySolar").innerText = dailySolarKwh.toFixed(1) + " kWh";
+            document.getElementById("headerSolarKwh").innerText = "SOLAR TODAY " + dailySolarKwh.toFixed(1) + " kWh";
+            updateSolarSourceUI();
+
             document.getElementById("ac").innerText = ac.toFixed(0) + " W";
+            document.getElementById("acDaily").innerText = dailyAcKwh.toFixed(1) + " kWh";
             document.getElementById("indoor").innerText = indoor.toFixed(1) + " °C";
-            
+
+            document.getElementById("fridge").innerText = fridge.w + " W";
+            document.getElementById("fridgeState").innerText = fridge.running ? "Compressor running" : "Compressor idle (cycling)";
+            document.getElementById("fridgeDaily").innerText = fridgeDailyKwh.toFixed(1) + " kWh";
+
+            document.getElementById("other").innerText = other + " W";
+            document.getElementById("otherDaily").innerText = otherDailyKwh.toFixed(1) + " kWh";
+
+            document.getElementById("houseTotal").innerText = houseTotal + " W";
+            document.getElementById("bdAc").innerText = ac + " W";
+            document.getElementById("bdFridge").innerText = fridge.w + " W";
+            document.getElementById("bdOther").innerText = other + " W";
+
             const gridEl = document.getElementById("grid");
             gridEl.innerText = (net >= 0 ? "+" : "") + net.toFixed(0) + " W";
             gridEl.className = net >= 0 ? "value text-emerald-400" : "value text-red-400";
-            
-            document.getElementById("status").innerHTML = 
-                net > 0 
-                ? `<span class="text-emerald-400">EXPORTING</span> <span class="font-mono">+${exportW} W</span>` 
+
+            document.getElementById("status").innerHTML =
+                net > 0
+                ? `<span class="text-emerald-400">EXPORTING</span> <span class="font-mono">+${exportW} W</span>`
                 : `<span class="text-red-400">IMPORTING</span> <span class="font-mono">${importW} W</span>`;
-            
+
             document.getElementById("export").innerText = exportW + " W";
             document.getElementById("import").innerText = importW + " W";
-            
+
             document.getElementById("daily").innerText = dailyCost.toFixed(2) + " XCG";
             document.getElementById("monthly").innerText = monthlyCost.toFixed(1) + " XCG";
-            
-            const acPercent = Math.min(100, Math.round((ac / 1280) * 100));
+            document.getElementById("savings").innerText = savings.toFixed(0) + " XCG saved";
+
+            document.getElementById("dailyTrend").innerHTML = dailyCost <= 0
+                ? `<i class="fas fa-arrow-down"></i> EARNING FROM SOLAR`
+                : `<i class="fas fa-bolt"></i> ${acMode ? "AC AT " + setpoint + "°C" : "AC OFF — LOWEST COST"}`;
+
+            const acPercent = Math.min(100, Math.round((ac / MAX_AC) * 100));
             document.getElementById("acBar").style.width = acPercent + "%";
+            document.getElementById("acPct").innerText = acPercent + "%";
         }
 
         // ---------------- START ----------------
         async function initialize() {
-            setMode(true);
+            loadState();
+            document.getElementById("solarManualInput").addEventListener("keydown", e => {
+                if (e.key === "Enter") applyManualSolar();
+            });
+            setMode(acMode);
+            setSetpoint(setpoint);
             updateClock();
             setInterval(updateClock, 1000);
-            
+
             await fetchWeather();
             setInterval(fetchWeather, 300000); // Refresh weather every 5 min
-            
+
             update();
             setInterval(update, 1200);
+            setInterval(saveState, 10000);
         }
 
         window.onload = initialize;
