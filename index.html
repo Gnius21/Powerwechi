@@ -463,6 +463,29 @@
                         </button>
                     </div>
                     <div id="solarManualInfo" class="text-[11px] text-white/35 mt-2">Using KNMI radiation to calculate panel output.</div>
+
+                    <!-- Daily kWh input -->
+                    <div class="mt-3 pt-3 border-t border-white/[0.05]">
+                        <div class="text-[11px] text-white/40 mb-2 flex items-center gap-2">
+                            <i class="fas fa-chart-line text-emerald-400 text-xs"></i>
+                            ACTUAL DAILY PRODUCTION (for stats)
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <input id="solarDailyInput" type="number" min="0" max="50" step="0.1"
+                                   placeholder="e.g. 0.8 kWh"
+                                   class="solar-input rounded-xl px-3 py-2 text-sm flex-1 min-w-[120px]">
+                            <button onclick="setSolarDaily()"
+                                    class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-900 hover:opacity-90 transition-all"
+                                    style="background:linear-gradient(to right,#34d399,#22d3ee)">
+                                <i class="fas fa-floppy-disk mr-1"></i>Save
+                            </button>
+                            <button onclick="clearSolarDaily()"
+                                    class="px-4 py-2 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">
+                                <i class="fas fa-xmark mr-1"></i>Clear
+                            </button>
+                        </div>
+                        <div id="solarDailyInfo" class="text-[11px] text-white/35 mt-2">Calculated: 0.0 kWh</div>
+                    </div>
                 </div>
             </div>
 
@@ -895,6 +918,7 @@ function closeSettings(){ document.getElementById("settingsOverlay").classList.a
 ═══════════════════════════════════════════════════════ */
 let acMode=true, setpoint=28, indoor=27.9;
 let dailySolarKwh=0, dailyAcKwh=0, dailyImportKwh=0, dailyExportKwh=0;
+let actualDailySolarKwh=null; // user-entered actual solar production for stats
 let knmiData=null, manualSolarW=null, manualSolarTime=null;
 let solarHistory=new Array(20).fill(0);
 let statsData=[];
@@ -904,7 +928,7 @@ let currentStatsTab='day';
    PERSISTENCE — APP STATE
 ═══════════════════════════════════════════════════════ */
 function saveState(){
-    try{localStorage.setItem("powerDash",JSON.stringify({acMode,setpoint,manualSolarW,manualSolarTime,dailySolarKwh,dailyAcKwh,dailyImportKwh,dailyExportKwh,day:new Date().toDateString()}));}catch(e){}
+    try{localStorage.setItem("powerDash",JSON.stringify({acMode,setpoint,manualSolarW,manualSolarTime,dailySolarKwh,dailyAcKwh,dailyImportKwh,dailyExportKwh,actualDailySolarKwh,day:new Date().toDateString()}));}catch(e){}
 }
 function loadState(){
     try{
@@ -915,6 +939,7 @@ function loadState(){
             // Same day — restore running counters
             dailySolarKwh=s.dailySolarKwh||0;dailyAcKwh=s.dailyAcKwh||0;
             dailyImportKwh=s.dailyImportKwh||0;dailyExportKwh=s.dailyExportKwh||0;
+            actualDailySolarKwh=typeof s.actualDailySolarKwh==='number'?s.actualDailySolarKwh:null;
             if(typeof s.manualSolarW==='number'){manualSolarW=s.manualSolarW;manualSolarTime=s.manualSolarTime||Date.now();}
         } else if(s.day && (s.dailySolarKwh||0)>0){
             // Day rolled over — archive the previous day before counters reset to 0
@@ -958,7 +983,8 @@ function archiveDaySnapshot(date,solar,ac,imp,exp){
 }
 function saveStats(){
     const today=new Date().toDateString();
-    const snap={date:today,solar_kwh:+dailySolarKwh.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE).toFixed(2)};
+    const solarVal=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
+    const snap={date:today,solar_kwh:+solarVal.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE).toFixed(2)};
     const idx=statsData.findIndex(d=>d.date===today);
     if(idx>=0)statsData[idx]=snap; else statsData.push(snap);
     if(statsData.length>30)statsData.splice(0,statsData.length-30);
@@ -1004,6 +1030,20 @@ function applyManualSolar(){
     manualSolarW=Math.round(v);manualSolarTime=Date.now();el.value="";saveState();update();
 }
 function clearManualSolar(){manualSolarW=null;manualSolarTime=null;saveState();update();}
+function setSolarDaily(){
+    const el=document.getElementById("solarDailyInput"),v=parseFloat(el.value);
+    if(isNaN(v)||v<0){el.classList.add("border-red-500");setTimeout(()=>el.classList.remove("border-red-500"),1200);return;}
+    actualDailySolarKwh=Math.round(v*10)/10;el.value="";saveState();updateSolarDaily();update();
+}
+function clearSolarDaily(){actualDailySolarKwh=null;saveState();updateSolarDaily();update();}
+function updateSolarDaily(){
+    const info=document.getElementById("solarDailyInfo");
+    if(actualDailySolarKwh!==null){
+        info.innerText=`✓ Using actual: ${actualDailySolarKwh} kWh (calculated was ${dailySolarKwh.toFixed(1)} kWh)`;
+    } else {
+        info.innerText=`Calculated: ${dailySolarKwh.toFixed(1)} kWh`;
+    }
+}
 function updateSolarSourceUI(){
     const src=document.getElementById("solarSource"),info=document.getElementById("solarManualInfo");
     if(manualSolarW!==null){
@@ -1321,7 +1361,7 @@ function update(){
     document.getElementById("solar").innerText=sol+" W";
     document.getElementById("dailySolar").innerText=dailySolarKwh.toFixed(1)+" kWh";
     document.getElementById("headerSolarKwh").innerText="SOLAR "+dailySolarKwh.toFixed(1)+" kWh";
-    updateSolarGauge(sol); updateSolarSourceUI();
+    updateSolarGauge(sol); updateSolarSourceUI(); updateSolarDaily();
 
     // AC
     const acPct=Math.min(100,Math.round(ac/MAX_AC*100));
@@ -1396,7 +1436,9 @@ function update(){
 async function initialize(){
     loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
+    updateSolarDaily(); // init daily solar display
     document.getElementById("solarManualInput").addEventListener("keydown",e=>{if(e.key==="Enter")applyManualSolar();});
+    document.getElementById("solarDailyInput").addEventListener("keydown",e=>{if(e.key==="Enter")setSolarDaily();});
     setMode(acMode); setSetpoint(setpoint);
     buildHistBars();
     updateClock(); setInterval(updateClock,1000);
