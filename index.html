@@ -175,6 +175,55 @@
                 <div id="currentTime" class="text-[13px] font-mono text-white/75 tabular-nums"></div>
                 <div id="currentDate" class="text-[11px] text-white/40"></div>
             </div>
+            <button onclick="openSettings()" title="System settings"
+                    class="w-9 h-9 rounded-2xl flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-all border border-white/10">
+                <i class="fas fa-gear"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══ SETTINGS MODAL ═══ -->
+    <div id="settingsOverlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4"
+         style="background:rgba(3,6,14,0.75);backdrop-filter:blur(6px)" onclick="if(event.target===this)closeSettings()">
+        <div class="card rounded-3xl p-6 w-full max-w-md card-accent-purple" style="background:rgba(14,20,46,0.97)">
+            <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-sliders text-purple-400"></i>
+                    <span class="text-base font-bold">My System Settings</span>
+                </div>
+                <button onclick="closeSettings()" class="text-white/40 hover:text-white text-lg w-7 h-7"><i class="fas fa-xmark"></i></button>
+            </div>
+            <p class="text-[11px] text-white/40 mb-4 leading-relaxed">Enter your real values so costs and solar output match your house.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>🌞</span>Solar panel peak power (W)</label>
+                    <input id="setPeak" type="number" min="100" step="10" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
+                    <div class="text-[10px] text-white/30 mt-1">Total rated wattage of all your panels combined.</div>
+                </div>
+                <div>
+                    <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>💰</span>Electricity import rate (XCG/kWh)</label>
+                    <input id="setRate" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
+                    <div class="text-[10px] text-white/30 mt-1">What you pay the utility per kWh used.</div>
+                </div>
+                <div>
+                    <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>⬆️</span>Feed-in / export credit (XCG/kWh)</label>
+                    <input id="setExport" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
+                    <div class="text-[10px] text-white/30 mt-1">What the utility credits you for exported solar (0 if none).</div>
+                </div>
+                <div>
+                    <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>🧊</span>Fridge running power (W)</label>
+                    <input id="setFridge" type="number" min="20" step="5" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
+                    <div class="text-[10px] text-white/30 mt-1">Compressor draw while running (check the label or a plug meter).</div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-6">
+                <button onclick="saveSettings()" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-900 hover:opacity-90 transition-all" style="background:linear-gradient(to right,#a78bfa,#22d3ee)">
+                    <i class="fas fa-check mr-1"></i>Save
+                </button>
+                <button onclick="closeSettings()" class="px-5 py-2.5 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -201,7 +250,7 @@
 
         <!-- POWER FLOW -->
         <div class="card rounded-3xl p-5 card-accent-green">
-            <div class="text-[10px] text-white/35 tracking-[0.2em] mb-4 text-center">LIVE POWER FLOW</div>
+            <div class="text-[10px] text-white/35 tracking-[0.2em] mb-4 text-center">LIVE POWER FLOW · <span id="selfSuff" class="text-emerald-400/70">—% SOLAR-POWERED</span></div>
             <div class="flex items-center gap-2">
 
                 <div class="flow-node flow-node-solar">
@@ -368,7 +417,7 @@
                 <div class="flex items-end justify-between mb-3">
                     <div>
                         <div id="solar" class="text-4xl font-bold text-emerald-400 tabular-nums" style="text-shadow:0 0 24px rgba(52,211,153,0.45)">0 W</div>
-                        <div class="text-xs text-white/40 mt-1">of <span class="text-white/60">920 W</span> peak</div>
+                        <div class="text-xs text-white/40 mt-1">of <span id="solarPeakLabel" class="text-white/60">920 W</span> peak</div>
                     </div>
                     <div class="text-right">
                         <div id="dailySolar" class="text-2xl font-bold text-emerald-300 tabular-nums">0.0 kWh</div>
@@ -732,14 +781,56 @@ function knmiToNormalized(p){
 }
 
 /* ═══════════════════════════════════════════════════════
-   SETTINGS
+   SETTINGS — configurable, persisted to localStorage
 ═══════════════════════════════════════════════════════ */
-const RATE=0.68, MAX_SOLAR=920, MAX_AC=1280;
-const FRIDGE_RUN_W=150, FRIDGE_IDLE_W=45, FRIDGE_DUTY=0.35, OTHER_BASE_W=42;
-const PANEL_EFF=MAX_SOLAR/1000*0.82;
+const MAX_AC=1280, FRIDGE_IDLE_W=45, FRIDGE_DUTY=0.35, OTHER_BASE_W=42;
 const AC_PROFILES={26:{base:560,dailyKwh:7.4},27:{base:480,dailyKwh:6.1},28:{base:420,dailyKwh:5.0}};
-const FRIDGE_DAILY=(FRIDGE_RUN_W*FRIDGE_DUTY+FRIDGE_IDLE_W*(1-FRIDGE_DUTY))*24/1000;
-const OTHER_DAILY=OTHER_BASE_W*24/1000;
+
+// User-configurable (defaults below). Mutated by the Settings panel.
+let RATE=0.68;          // import price XCG/kWh
+let EXPORT_RATE=0.27;   // feed-in credit XCG/kWh
+let MAX_SOLAR=920;      // panel peak W
+let FRIDGE_RUN_W=150;   // fridge compressor running W
+
+// Derived — recomputed whenever settings change
+let PANEL_EFF, FRIDGE_DAILY, OTHER_DAILY;
+function recomputeDerived(){
+    PANEL_EFF=MAX_SOLAR/1000*0.82;
+    FRIDGE_DAILY=(FRIDGE_RUN_W*FRIDGE_DUTY+FRIDGE_IDLE_W*(1-FRIDGE_DUTY))*24/1000;
+    OTHER_DAILY=OTHER_BASE_W*24/1000;
+}
+function loadSettings(){
+    try{
+        const s=JSON.parse(localStorage.getItem("powerSettings"));
+        if(s){
+            if(s.RATE>0)RATE=s.RATE;
+            if(s.EXPORT_RATE>=0)EXPORT_RATE=s.EXPORT_RATE;
+            if(s.MAX_SOLAR>0)MAX_SOLAR=s.MAX_SOLAR;
+            if(s.FRIDGE_RUN_W>0)FRIDGE_RUN_W=s.FRIDGE_RUN_W;
+        }
+    }catch(e){}
+    recomputeDerived();
+}
+function saveSettings(){
+    RATE=Math.max(0,parseFloat(document.getElementById("setRate").value)||RATE);
+    EXPORT_RATE=Math.max(0,parseFloat(document.getElementById("setExport").value)||0);
+    MAX_SOLAR=Math.max(100,parseFloat(document.getElementById("setPeak").value)||MAX_SOLAR);
+    FRIDGE_RUN_W=Math.max(20,parseFloat(document.getElementById("setFridge").value)||FRIDGE_RUN_W);
+    try{localStorage.setItem("powerSettings",JSON.stringify({RATE,EXPORT_RATE,MAX_SOLAR,FRIDGE_RUN_W}));}catch(e){}
+    recomputeDerived();
+    // Refresh peak-label text and re-run
+    const pl=document.getElementById("solarPeakLabel"); if(pl)pl.innerText=MAX_SOLAR+" W";
+    closeSettings();
+    update();
+}
+function openSettings(){
+    document.getElementById("setRate").value=RATE;
+    document.getElementById("setExport").value=EXPORT_RATE;
+    document.getElementById("setPeak").value=MAX_SOLAR;
+    document.getElementById("setFridge").value=FRIDGE_RUN_W;
+    document.getElementById("settingsOverlay").classList.remove("hidden");
+}
+function closeSettings(){ document.getElementById("settingsOverlay").classList.add("hidden"); }
 
 /* ═══════════════════════════════════════════════════════
    STATE
@@ -794,13 +885,13 @@ function generateInitialStats(){
         const total=ac+FRIDGE_DAILY+OTHER_DAILY;
         const net=total-sol;
         const imp=Math.max(0,net),exp=Math.max(0,-net);
-        statsData.push({date:d.toDateString(),solar_kwh:sol,import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:ac,fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((imp-exp*0.4)*RATE).toFixed(2)});
+        statsData.push({date:d.toDateString(),solar_kwh:sol,import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:ac,fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)});
     }
 }
 function archiveDaySnapshot(date,solar,ac,imp,exp){
     // Skip if already recorded
     if(statsData.find(d=>d.date===date))return;
-    const snap={date,solar_kwh:+solar.toFixed(1),import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:+ac.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((imp-exp*0.4)*RATE).toFixed(2)};
+    const snap={date,solar_kwh:+solar.toFixed(1),import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:+ac.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)};
     statsData.push(snap);
     // Keep sorted oldest→newest, trim to 30
     statsData.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -809,7 +900,7 @@ function archiveDaySnapshot(date,solar,ac,imp,exp){
 }
 function saveStats(){
     const today=new Date().toDateString();
-    const snap={date:today,solar_kwh:+dailySolarKwh.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((dailyImportKwh-dailyExportKwh*0.4)*RATE).toFixed(2)};
+    const snap={date:today,solar_kwh:+dailySolarKwh.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE).toFixed(2)};
     const idx=statsData.findIndex(d=>d.date===today);
     if(idx>=0)statsData[idx]=snap; else statsData.push(snap);
     if(statsData.length>30)statsData.splice(0,statsData.length-30);
@@ -973,6 +1064,10 @@ function updateFlowCard(sol,house,net){
         const el=document.getElementById(id);
         el.className="fdot "+(exp?"bg-emerald-400":"bg-red-400 rev");
     });
+    // Self-sufficiency: share of current house load met by solar right now
+    const ss=house>0?Math.min(100,Math.round(sol/house*100)):0;
+    document.getElementById("selfSuff").innerText=ss+"% SOLAR-POWERED";
+    document.getElementById("selfSuff").className=ss>=100?"text-emerald-400":ss>=50?"text-emerald-400/70":"text-yellow-400/70";
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -993,7 +1088,7 @@ function setStatsTab(tab){
 function renderStatsToday(){
     const yest=statsData.length>0?statsData[statsData.length-1]:null;
     document.getElementById("stTodaySolar").innerText=dailySolarKwh.toFixed(1)+" kWh";
-    const cost=+(dailyImportKwh-dailyExportKwh*0.4)*RATE;
+    const cost=+(dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE);
     document.getElementById("stTodayCost").innerText=cost.toFixed(2)+" XCG";
     document.getElementById("stTodayExport").innerText=dailyExportKwh.toFixed(1)+" kWh";
     document.getElementById("stTodayImport").innerText=dailyImportKwh.toFixed(1)+" kWh";
@@ -1186,6 +1281,7 @@ function update(){
    INIT
 ═══════════════════════════════════════════════════════ */
 async function initialize(){
+    loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
     document.getElementById("solarManualInput").addEventListener("keydown",e=>{if(e.key==="Enter")applyManualSolar();});
     setMode(acMode); setSetpoint(setpoint);
