@@ -763,9 +763,13 @@ function loadState(){
         acMode=[true,false].includes(s.acMode)?s.acMode:true;
         setpoint=[26,27,28].includes(s.setpoint)?s.setpoint:28;
         if(s.day===new Date().toDateString()){
+            // Same day — restore running counters
             dailySolarKwh=s.dailySolarKwh||0;dailyAcKwh=s.dailyAcKwh||0;
             dailyImportKwh=s.dailyImportKwh||0;dailyExportKwh=s.dailyExportKwh||0;
             if(typeof s.manualSolarW==='number'){manualSolarW=s.manualSolarW;manualSolarTime=s.manualSolarTime||Date.now();}
+        } else if(s.day && (s.dailySolarKwh||0)>0){
+            // Day rolled over — archive the previous day before counters reset to 0
+            archiveDaySnapshot(s.day,s.dailySolarKwh||0,s.dailyAcKwh||0,s.dailyImportKwh||0,s.dailyExportKwh||0);
         }
     }catch(e){}
 }
@@ -793,12 +797,22 @@ function generateInitialStats(){
         statsData.push({date:d.toDateString(),solar_kwh:sol,import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:ac,fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((imp-exp*0.4)*RATE).toFixed(2)});
     }
 }
+function archiveDaySnapshot(date,solar,ac,imp,exp){
+    // Skip if already recorded
+    if(statsData.find(d=>d.date===date))return;
+    const snap={date,solar_kwh:+solar.toFixed(1),import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:+ac.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((imp-exp*0.4)*RATE).toFixed(2)};
+    statsData.push(snap);
+    // Keep sorted oldest→newest, trim to 30
+    statsData.sort((a,b)=>new Date(a.date)-new Date(b.date));
+    if(statsData.length>30)statsData.splice(0,statsData.length-30);
+    try{localStorage.setItem("powerStats",JSON.stringify(statsData));}catch(e){}
+}
 function saveStats(){
     const today=new Date().toDateString();
-    const snap={date:today,solar_kwh:+dailySolarKwh.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(+(dailyImportKwh-dailyExportKwh*0.4)*RATE).toFixed(2)};
-    if(statsData.length>0&&statsData[statsData.length-1].date===today) statsData[statsData.length-1]=snap;
-    else statsData.push(snap);
-    if(statsData.length>30)statsData.shift();
+    const snap={date:today,solar_kwh:+dailySolarKwh.toFixed(1),import_kwh:+dailyImportKwh.toFixed(1),export_kwh:+dailyExportKwh.toFixed(1),ac_kwh:+dailyAcKwh.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+((dailyImportKwh-dailyExportKwh*0.4)*RATE).toFixed(2)};
+    const idx=statsData.findIndex(d=>d.date===today);
+    if(idx>=0)statsData[idx]=snap; else statsData.push(snap);
+    if(statsData.length>30)statsData.splice(0,statsData.length-30);
     try{localStorage.setItem("powerStats",JSON.stringify(statsData));}catch(e){}
 }
 
@@ -1172,7 +1186,7 @@ function update(){
    INIT
 ═══════════════════════════════════════════════════════ */
 async function initialize(){
-    loadState(); loadStats();
+    loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
     document.getElementById("solarManualInput").addEventListener("keydown",e=>{if(e.key==="Enter")applyManualSolar();});
     setMode(acMode); setSetpoint(setpoint);
     buildHistBars();
