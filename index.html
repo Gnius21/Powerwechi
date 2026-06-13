@@ -1010,12 +1010,14 @@ function updateSolarSourceUI(){
         const m=Math.floor((Date.now()-manualSolarTime)/60000);
         src.innerText="Manual inverter reading";
         info.innerHTML=`<span class="text-emerald-400">✓ ${manualSolarW} W</span> (${m<1?"just now":m+" min ago"}) — press Auto to use KNMI.`;
-    } else if(knmiData&&knmiData.radiation!==null){
-        src.innerText=`From ${_wxSrc||'weather'} radiation`;
-        info.innerText=`${_wxSrc||'Weather'}: ${knmiData.radiation} W/m² → ~${Math.round(knmiData.radiation*PANEL_EFF)} W from your panels.`;
+    } else if(knmiData&&knmiData.temp_c!==null){
+        src.innerText=`From sun position (${_wxSrc||'weather'})`;
+        const cc=knmiData.cloud_octa!=null?knmiData.cloud_octa*12.5:0;
+        const estimate=calcSolarFromSunPosition(MAX_SOLAR,cc);
+        info.innerText=`${_wxSrc||'Weather'}: ~${estimate} W estimated. KNMI radiation${knmiData.radiation!=null?' ('+knmiData.radiation+' W/m²)':''} shown below.`;
     } else {
-        src.innerText="Estimating (KNMI connecting…)";
-        info.innerText="Waiting for KNMI. Enter your inverter reading above for accurate output.";
+        src.innerText="Estimating (weather connecting…)";
+        info.innerText="Waiting for weather data. Enter your inverter reading above for accurate output.";
     }
 }
 
@@ -1044,24 +1046,47 @@ function buildRain(intensity){
 }
 
 /* ═══════════════════════════════════════════════════════
+   SOLAR POSITION CALCULATION
+═══════════════════════════════════════════════════════ */
+function calcSolarElevation(){
+    const now=new Date(),lat=12.17,lng=-68.99;
+    const J=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
+    const n=Math.floor(275*M/9)-Math.floor((M+9)/12)*2+D-30; // day of year
+    const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(n-81)/365); // declination
+    const h_utc=now.getUTCHours()+now.getUTCMinutes()/60+now.getUTCSeconds()/3600;
+    const h_local=h_utc-4; // Curaçao is UTC-4
+    const H=Math.PI/12*(h_local-12); // hour angle (15° per hour)
+    const lat_rad=lat*Math.PI/180;
+    const sinElev=Math.sin(lat_rad)*Math.sin(dec)+Math.cos(lat_rad)*Math.cos(dec)*Math.cos(H);
+    return Math.asin(Math.max(0,sinElev))*180/Math.PI;
+}
+function calcSolarFromSunPosition(maxW,cloudCover){
+    const elev=calcSolarElevation();
+    if(elev<=0)return 0; // night
+    const clearSky=Math.pow(Math.sin(elev*Math.PI/180),1.5)*maxW; // AM relative mass effect
+    const cloudFac=1-((cloudCover||0)/100)*0.75; // clouds reduce by up to 75%
+    return Math.round(clearSky*cloudFac);
+}
+
+/* ═══════════════════════════════════════════════════════
    KNMI FETCH + UI
 ═══════════════════════════════════════════════════════ */
 let _wxSrc='';
 
-// Race KNMI Bonaire and Open-Meteo Curaçao simultaneously; use whichever responds first
+// Prioritize Open-Meteo Curaçao (fast, reliable); fall back to KNMI Bonaire
 async function fetchKnmi(){
     setKnmiStatus("busy");
-    const knmiP=fetchKnmiPage().then(raw=>{
-        const d=knmiToNormalized(parseKnmiBonaire(raw));
-        if(d&&d.temp_c!==null)return{data:d,src:'KNMI Bonaire'};
+    const omP=fetchOpenMeteo().then(d=>{
+        if(d&&d.temp_c!==null)return{data:d,src:'Open-Meteo',isOM:true};
         throw new Error('no data');
     });
-    const omP=fetchOpenMeteo().then(d=>{
-        if(d&&d.temp_c!==null)return{data:d,src:'Open-Meteo'};
+    const knmiP=fetchKnmiPage().then(raw=>{
+        const d=knmiToNormalized(parseKnmiBonaire(raw));
+        if(d&&d.temp_c!==null)return{data:d,src:'KNMI Bonaire',isOM:false};
         throw new Error('no data');
     });
     try{
-        const res=await Promise.any([knmiP,omP]);
+        const res=await Promise.any([omP,knmiP]);
         knmiData=res.data; _wxSrc=res.src;
         applyKnmiUI(res.data,res.src);
         setKnmiStatus("ok",res.src);
@@ -1247,9 +1272,13 @@ function outdoorFeelsLike(){
 }
 function solar(){
     if(manualSolarW!==null)return manualSolarW;
-    if(knmiData&&knmiData.radiation!==null)return Math.max(0,Math.round(knmiData.radiation*PANEL_EFF));
-    const t=(Date.now()%86400000)/86400000,I=Math.max(0,Math.sin(t*Math.PI*2-Math.PI/2));
-    return Math.round(I*MAX_SOLAR*0.72);
+    if(knmiData&&knmiData.temp_c!==null){
+        const cloudCover=knmiData.cloud_octa!=null?knmiData.cloud_octa*12.5:0;
+        return calcSolarFromSunPosition(MAX_SOLAR,cloudCover);
+    }
+    // Fallback: sun position estimate (no cloud data)
+    const cloudCover=0;
+    return calcSolarFromSunPosition(MAX_SOLAR,cloudCover);
 }
 function acPower(ind,out){
     if(!acMode)return 8;
