@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>House Power Dashboard - Curaçao</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#050810">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PowerDash">
+    <link rel="apple-touch-icon" href="icon.svg">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -175,6 +185,10 @@
                 <div id="currentTime" class="text-[13px] font-mono text-white/75 tabular-nums"></div>
                 <div id="currentDate" class="text-[11px] text-white/40"></div>
             </div>
+            <button id="installBtn" onclick="installPWA()" title="Install app on device"
+                    class="hidden w-9 h-9 rounded-2xl flex items-center justify-center text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 transition-all border border-emerald-400/30">
+                <i class="fas fa-download text-sm"></i>
+            </button>
             <button onclick="openSettings()" title="System settings"
                     class="w-9 h-9 rounded-2xl flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-all border border-white/10">
                 <i class="fas fa-gear"></i>
@@ -1304,6 +1318,40 @@ async function initialize(){
     fetchKnmi(); setInterval(fetchKnmi,10*60*1000);
 }
 window.onload=initialize;
+
+/* ═══════════════════════════════════════════════════════
+   PWA — service worker + wake lock + install prompt
+═══════════════════════════════════════════════════════ */
+
+// Register service worker (enables offline + installability)
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// Wake Lock — keep screen on while dashboard is visible
+let _wakeLock=null;
+async function _requestWakeLock(){
+    if(!('wakeLock' in navigator))return;
+    try{ _wakeLock=await navigator.wakeLock.request('screen'); _wakeLock.addEventListener('release',()=>{_wakeLock=null;}); }catch(e){}
+}
+document.addEventListener('visibilitychange',async()=>{ if(document.visibilityState==='visible'&&!_wakeLock)await _requestWakeLock(); });
+_requestWakeLock();
+
+// Install prompt (Android Chrome shows a banner; iOS shows manual instructions)
+let _installPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault(); _installPrompt=e;
+    document.getElementById('installBtn').classList.remove('hidden');
+});
+window.addEventListener('appinstalled',()=>{
+    document.getElementById('installBtn').classList.add('hidden');
+    _installPrompt=null;
+});
+function installPWA(){
+    if(_installPrompt){ _installPrompt.prompt(); _installPrompt.userChoice.then(()=>{_installPrompt=null;}); return; }
+    // iOS: no prompt API — show instructions
+    alert('On iPhone/iPad:\n1. Tap the Share button (box with arrow)\n2. Tap "Add to Home Screen"\n3. Tap Add\n\nThe dashboard will then open as a full-screen app.');
+}
 </script>
 </body>
 </html>
