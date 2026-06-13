@@ -365,9 +365,9 @@
                         <div class="text-[10px] text-white/35 tracking-widest">RAIN</div>
                         <div class="rain-wrap w-full" id="rainWrap"></div>
                         <div class="text-center leading-tight mt-1">
-                            <div id="wxPrecip" class="text-[17px] font-bold text-blue-300 tabular-nums">0.0 mm</div>
+                            <div id="wxPrecip" class="text-[17px] font-bold text-blue-300 tabular-nums">—</div>
                             <div class="text-[10px] text-white/30">per 10 min</div>
-                            <div id="wxRainStatus" class="text-xs text-white/45 mt-0.5">Dry</div>
+                            <div id="wxRainStatus" class="text-xs text-white/45 mt-0.5">—</div>
                         </div>
                     </div>
 
@@ -767,7 +767,7 @@ function parseKnmiBonaire(raw){
     while((m=re.exec(h))!==null)o[m[1].replace(/&deg;/g,'°').replace(/\s+/g,' ').trim()]={value:(m[2]||'').replace(/&nbsp;/g,' ').trim(),extra:(m[3]||'').replace(/[()%]/g,'').trim()};
     if(Object.keys(o).filter(k=>k!=='time').length>=3)return o;
     var t=h.replace(/<[^>]+>/g,' ').replace(/&deg;/g,'°').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
-    [['Winddirection (Sector/deg)',/Winddirection[^A-Za-z]*\(?Sector\/deg\)?\s*([NESW]{1,3})\s*\(?\s*(\d{1,3})/i,true],['Windspeed (m/s)',/Windspeed[^0-9-]*([\d.]+)/i],['Gusts (m/s)',/Gusts[^0-9-]*([\d.]+)/i],['Cloud cover (Octa / %)',/Cloud cover[^0-9-]*([\d.]+)/i],['Radiation (W/m2)',/Radiation[^0-9-]*([\d.]+)/i],['Precipitation (mm/10 min)',/Precipitation[^0-9-]*([\d.]+)/i],['Relative humidity (%)',/Relative humidity[^0-9-]*([\d.]+)/i],['Temperature (°C)',/Temperature[^0-9-]*(-?[\d.]+)/i],['Dewpoint temperature (°C)',/Dewpoint[^0-9-]*(-?[\d.]+)/i],['Visibility (m)',/Visibility[^0-9-]*([\d.]+)/i],['Pressure (hPa)',/Pressure[^0-9-]*([\d.]+)/i]
+    [['Winddirection (Sector/deg)',/Winddirection[^A-Za-z]*\(?Sector\/deg\)?\s*([NESW]{1,3})\s*\(?\s*(\d{1,3})/i,true],['Windspeed (m/s)',/Windspeed[^0-9-]*([\d.]+)/i],['Gusts (m/s)',/Gusts[^0-9-]*([\d.]+)/i],['Cloud cover (Octa / %)',/Cloud cover[^0-9-]*([\d.]+)/i],['Radiation (W/m2)',/Radiation\s*\([^)]*\)\s*([\d.]+)/i],['Precipitation (mm/10 min)',/Precipitation\s*\([^)]*\)\s*([\d.]+)/i],['Relative humidity (%)',/Relative humidity[^0-9-]*([\d.]+)/i],['Temperature (°C)',/Temperature[^0-9-]*(-?[\d.]+)/i],['Dewpoint temperature (°C)',/Dewpoint[^0-9-]*(-?[\d.]+)/i],['Visibility (m)',/Visibility[^0-9-]*([\d.]+)/i],['Pressure (hPa)',/Pressure[^0-9-]*([\d.]+)/i]
     ].forEach(p=>{var mm=t.match(p[1]);if(mm)o[p[0]]=p[2]?{value:mm[1],extra:mm[2]||''}:{value:mm[1],extra:''};});
     if(!o.time){var tt=t.match(/Bonaire\s+([A-Za-z]{3},?\s+\d{1,2}\s+\w+\s+\d{4}\s+[\d:]+\s*UTC)/);if(tt)o.time=tt[1].trim();}
     return o;
@@ -1016,17 +1016,29 @@ function applyKnmiUI(d){
     document.getElementById("wxGustKt").innerText=d.gust_kt!==null?"gust "+d.gust_kt+" kt":"gust — kt";
     if(d.wind_dir!==null&&!isNaN(d.wind_dir))
         document.getElementById("compassGroup").style.transform=`rotate(${d.wind_dir+180}deg)`;
-    const pr=d.precip_10m||0;
-    document.getElementById("wxPrecip").innerText=pr.toFixed(1)+" mm";
-    document.getElementById("wxRainStatus").innerText=pr<=0?"Dry":pr<0.5?"Light rain":pr<2?"Moderate":"Heavy rain";
-    buildRain(pr);
+    const pr=d.precip_10m;
+    if(pr!==null){
+        document.getElementById("wxPrecip").innerText=pr.toFixed(1)+" mm";
+        document.getElementById("wxRainStatus").innerText=pr<=0?"Dry":pr<0.5?"Light rain":pr<2?"Moderate":"Heavy rain";
+        buildRain(pr);
+    } else {
+        document.getElementById("wxPrecip").innerText="—";
+        document.getElementById("wxRainStatus").innerText="—";
+        buildRain(0);
+    }
     const uvi=toUVI(d.radiation),ui=uviInfo(uvi);
-    document.getElementById("wxUvNum").innerText=d.radiation!==null?uvi.toFixed(1):"—";
-    document.getElementById("wxUvNum").className="text-3xl font-bold tabular-nums "+ui.cls;
-    document.getElementById("wxUvLabel").innerText=ui.lbl;
-    document.getElementById("wxUvLabel").className="text-[11px] font-semibold mt-0.5 "+ui.cls;
-    document.getElementById("uvCursor").style.left=`calc(${Math.min(100,uvi/13*100).toFixed(1)}% - 6px)`;
-    document.getElementById("wxRadiation").innerText=d.radiation!==null?d.radiation+" W/m²":"— W/m²";
+    if(d.radiation!==null){
+        document.getElementById("wxUvNum").innerText=uvi.toFixed(1);
+        document.getElementById("wxUvNum").className="text-3xl font-bold tabular-nums "+ui.cls;
+        document.getElementById("wxUvLabel").innerText=ui.lbl;
+        document.getElementById("wxUvLabel").className="text-[11px] font-semibold mt-0.5 "+ui.cls;
+        document.getElementById("uvCursor").style.left=`calc(${Math.min(100,uvi/13*100).toFixed(1)}% - 6px)`;
+        document.getElementById("wxRadiation").innerText=d.radiation+" W/m²";
+    } else {
+        document.getElementById("wxUvNum").innerText="—";
+        document.getElementById("wxUvLabel").innerText="—";
+        document.getElementById("wxRadiation").innerText="— W/m²";
+    }
 }
 
 /* ═══════════════════════════════════════════════════════
