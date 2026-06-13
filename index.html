@@ -380,7 +380,7 @@
                         <div class="rain-wrap w-full" id="rainWrap"></div>
                         <div class="text-center leading-tight mt-1">
                             <div id="wxPrecip" class="text-[17px] font-bold text-blue-300 tabular-nums">—</div>
-                            <div class="text-[10px] text-white/30">per 10 min</div>
+                            <div class="text-[10px] text-white/30" id="wxPrecipPeriod">per 10 min</div>
                             <div id="wxRainStatus" class="text-xs text-white/45 mt-0.5">—</div>
                         </div>
                     </div>
@@ -759,7 +759,7 @@
     </div><!-- /container -->
 
     <div class="text-center text-[11px] text-white/20 pb-6">
-        Weather &amp; radiation · KNMI Bonaire · Solar = radiation × panel efficiency
+        Weather · KNMI Bonaire / Open-Meteo Curaçao · Solar = radiation × panel efficiency
     </div>
 
 </div><!-- /above-bg -->
@@ -769,9 +769,53 @@
    KNMI BONAIRE SCRAPER
 ═══════════════════════════════════════════════════════ */
 const KNMI_URL='https://www.knmidc.org/weather/bonaire/?Current';
+
+// Race all 3 proxies in parallel — use whichever responds first (faster than sequential)
 async function fetchKnmiPage(){
     const proxies=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://r.jina.ai/'+u,u=>u];
-    for(const w of proxies){try{const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);const r=await fetch(w(KNMI_URL),{signal:c.signal});clearTimeout(t);if(r.ok){const x=await r.text();if(x&&x.length>500)return x;}}catch(e){}}return null;
+    try{
+        return await Promise.any(proxies.map(async w=>{
+            const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);
+            try{
+                const r=await fetch(w(KNMI_URL),{signal:c.signal});clearTimeout(t);
+                if(!r.ok)throw new Error('!ok');
+                const x=await r.text();
+                if(!x||x.length<500)throw new Error('short');
+                return x;
+            }catch(e){clearTimeout(t);throw e;}
+        }));
+    }catch(e){return null;}
+}
+
+// Open-Meteo: free, no API key, direct CORS, used as parallel fallback for Curaçao
+async function fetchOpenMeteo(){
+    try{
+        const url='https://api.open-meteo.com/v1/forecast?latitude=12.17&longitude=-68.99' +
+            '&current=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,' +
+            'wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,pressure_msl,shortwave_radiation' +
+            '&wind_speed_unit=kn&timezone=America%2FCuracao&forecast_days=1';
+        const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);
+        const r=await fetch(url,{signal:c.signal});clearTimeout(t);
+        if(!r.ok)return null;
+        const j=await r.json(),cur=j.current;
+        if(!cur||cur.temperature_2m==null)return null;
+        return{
+            temp_c:cur.temperature_2m??null,
+            dew_c:cur.dew_point_2m??null,
+            rh:cur.relative_humidity_2m??null,
+            wind_kt:cur.wind_speed_10m!=null?Math.round(cur.wind_speed_10m):null,
+            gust_kt:cur.wind_gusts_10m!=null?Math.round(cur.wind_gusts_10m):null,
+            wind_dir:cur.wind_direction_10m??null,
+            wind_sector:null,
+            cloud_octa:cur.cloud_cover!=null?Math.round(cur.cloud_cover/12.5):null,
+            radiation:cur.shortwave_radiation??null,
+            precip_10m:cur.precipitation??null,
+            vis_m:null,
+            slp:cur.pressure_msl??null,
+            time:cur.time?cur.time.replace('T',' ')+' (Curaçao)':null,
+            ts:Date.now()
+        };
+    }catch(e){return null;}
 }
 function parseKnmiBonaire(raw){
     if(!raw)return null;
@@ -967,8 +1011,8 @@ function updateSolarSourceUI(){
         src.innerText="Manual inverter reading";
         info.innerHTML=`<span class="text-emerald-400">✓ ${manualSolarW} W</span> (${m<1?"just now":m+" min ago"}) — press Auto to use KNMI.`;
     } else if(knmiData&&knmiData.radiation!==null){
-        src.innerText="From KNMI radiation";
-        info.innerText=`KNMI: ${knmiData.radiation} W/m² → ~${Math.round(knmiData.radiation*PANEL_EFF)} W from your panels.`;
+        src.innerText=`From ${_wxSrc||'weather'} radiation`;
+        info.innerText=`${_wxSrc||'Weather'}: ${knmiData.radiation} W/m² → ~${Math.round(knmiData.radiation*PANEL_EFF)} W from your panels.`;
     } else {
         src.innerText="Estimating (KNMI connecting…)";
         info.innerText="Waiting for KNMI. Enter your inverter reading above for accurate output.";
@@ -1002,19 +1046,32 @@ function buildRain(intensity){
 /* ═══════════════════════════════════════════════════════
    KNMI FETCH + UI
 ═══════════════════════════════════════════════════════ */
+let _wxSrc='';
+
+// Race KNMI Bonaire and Open-Meteo Curaçao simultaneously; use whichever responds first
 async function fetchKnmi(){
     setKnmiStatus("busy");
+    const knmiP=fetchKnmiPage().then(raw=>{
+        const d=knmiToNormalized(parseKnmiBonaire(raw));
+        if(d&&d.temp_c!==null)return{data:d,src:'KNMI Bonaire'};
+        throw new Error('no data');
+    });
+    const omP=fetchOpenMeteo().then(d=>{
+        if(d&&d.temp_c!==null)return{data:d,src:'Open-Meteo'};
+        throw new Error('no data');
+    });
     try{
-        const data=knmiToNormalized(parseKnmiBonaire(await fetchKnmiPage()));
-        if(data&&data.temp_c!==null){knmiData=data;applyKnmiUI(data);setKnmiStatus("ok");}
-        else setKnmiStatus("err");
+        const res=await Promise.any([knmiP,omP]);
+        knmiData=res.data; _wxSrc=res.src;
+        applyKnmiUI(res.data,res.src);
+        setKnmiStatus("ok",res.src);
     }catch(e){setKnmiStatus("err");}
 }
-function setKnmiStatus(s){
+function setKnmiStatus(s,src){
     document.getElementById("knmiDot").className="w-1.5 h-1.5 rounded-full inline-block "+(s==="ok"?"knmi-ok":s==="busy"?"knmi-busy pulse-dot":"knmi-err");
-    document.getElementById("knmiTxt").innerText=s==="ok"?"KNMI LIVE":s==="busy"?"KNMI…":"KNMI ERR";
+    document.getElementById("knmiTxt").innerText=s==="ok"?(src||'Weather')+' LIVE':s==="busy"?"Weather…":"No data";
 }
-function applyKnmiUI(d){
+function applyKnmiUI(d,src){
     const feels=(d.temp_c!==null&&d.rh!==null)?heatIndex(d.temp_c,d.rh):(d.temp_c||31);
     document.getElementById("wxFeels").innerText=(feels!==null?feels.toFixed(0):"—")+"°";
     document.getElementById("wxAir").innerText=d.temp_c!==null?d.temp_c.toFixed(1):"—";
@@ -1034,6 +1091,7 @@ function applyKnmiUI(d){
     if(pr!==null){
         document.getElementById("wxPrecip").innerText=pr.toFixed(1)+" mm";
         document.getElementById("wxRainStatus").innerText=pr<=0?"Dry":pr<0.5?"Light rain":pr<2?"Moderate":"Heavy rain";
+        document.getElementById("wxPrecipPeriod").innerText=src&&src.includes('Open-Meteo')?'per hr':'per 10 min';
         buildRain(pr);
     } else {
         document.getElementById("wxPrecip").innerText="—";
