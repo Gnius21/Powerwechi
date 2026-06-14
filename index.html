@@ -242,11 +242,14 @@
                 </div>
             </div>
 
+            <div id="settingsSaved" class="hidden mb-3 rounded-xl px-3 py-2 text-[12px] font-semibold text-emerald-400 text-center" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25)">
+                ✓ Settings saved
+            </div>
             <div class="flex gap-2 mt-6">
-                <button onclick="saveSettings()" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-900 hover:opacity-90 transition-all" style="background:linear-gradient(to right,#a78bfa,#22d3ee)">
+                <button onclick="saveSettings()" aria-label="Save settings" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-900 hover:opacity-90 transition-all" style="background:linear-gradient(to right,#a78bfa,#22d3ee)">
                     <i class="fas fa-check mr-1"></i>Save
                 </button>
-                <button onclick="closeSettings()" class="px-5 py-2.5 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">Cancel</button>
+                <button onclick="closeSettings()" aria-label="Cancel" class="px-5 py-2.5 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">Cancel</button>
             </div>
         </div>
     </div>
@@ -328,8 +331,7 @@
                         </div>
                     </div>
                     <div class="text-right">
-                        <div id="wxPressure" class="text-[13px] font-semibold text-purple-300">— hPa</div>
-                        <div id="wxObsTime" class="text-[10px] text-white/25 mt-0.5">KNMI Bonaire</div>
+                        <div id="wxObsTime" class="text-[10px] text-white/25">KNMI Bonaire</div>
                     </div>
                 </div>
 
@@ -352,6 +354,17 @@
                             <span id="wxRh" class="text-lg font-semibold text-sky-200 tabular-nums">—</span>
                             <span class="text-[11px] text-white/35">% rh</span>
                         </div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="wxCloud" class="text-lg font-semibold text-white/55 tabular-nums">—</span>
+                            <span class="text-[11px] text-white/35">/ 8 okta</span>
+                        </div>
+                    </div>
+                    <div class="ml-auto text-right mb-1">
+                        <div class="flex items-center justify-end gap-1">
+                            <span id="wxPressureTrend" class="text-lg font-bold text-purple-300"></span>
+                            <span id="wxPressure" class="text-[13px] font-semibold text-purple-300">— hPa</span>
+                        </div>
+                        <div id="wxPressureHint" class="text-[10px] text-white/25 mt-0.5">pressure</div>
                     </div>
                 </div>
 
@@ -613,28 +626,28 @@
                     <div class="flex justify-between items-center">
                         <span class="text-cyan-400">❄️ AC</span>
                         <div class="flex items-center gap-2">
-                            <div class="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div class="w-16 sm:w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                 <div id="bdAcBar" class="h-full bg-cyan-400 rounded-full transition-all duration-700" style="width:0%"></div>
                             </div>
-                            <span id="bdAc" class="font-mono w-14 text-right tabular-nums">0 W</span>
+                            <span id="bdAc" class="font-mono w-12 text-right tabular-nums">0 W</span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-blue-300">🧊 Fridge</span>
                         <div class="flex items-center gap-2">
-                            <div class="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div class="w-16 sm:w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                 <div id="bdFridgeBar" class="h-full bg-blue-300 rounded-full transition-all duration-700" style="width:0%"></div>
                             </div>
-                            <span id="bdFridge" class="font-mono w-14 text-right tabular-nums">0 W</span>
+                            <span id="bdFridge" class="font-mono w-12 text-right tabular-nums">0 W</span>
                         </div>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-white/50">💡 Other</span>
                         <div class="flex items-center gap-2">
-                            <div class="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div class="w-16 sm:w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                 <div id="bdOtherBar" class="h-full bg-white/40 rounded-full transition-all duration-700" style="width:0%"></div>
                             </div>
-                            <span id="bdOther" class="font-mono w-14 text-right tabular-nums">0 W</span>
+                            <span id="bdOther" class="font-mono w-12 text-right tabular-nums">0 W</span>
                         </div>
                     </div>
                 </div>
@@ -654,12 +667,12 @@
                 </div>
                 <div class="flex gap-3 mt-4">
                     <div class="flex-1 rounded-2xl py-4 text-center" style="background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.15)">
-                        <div class="text-[11px] text-emerald-400 tracking-widest mb-1">EXPORT</div>
-                        <div id="export" class="text-2xl font-bold text-emerald-400 tabular-nums">0 W</div>
+                        <div class="text-[11px] text-emerald-400 tracking-widest mb-1" aria-label="Exporting to grid">↑ EXPORT</div>
+                        <div id="export" class="text-2xl font-bold text-emerald-400 tabular-nums" aria-live="polite">0 W</div>
                     </div>
                     <div class="flex-1 rounded-2xl py-4 text-center" style="background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.15)">
-                        <div class="text-[11px] text-red-400 tracking-widest mb-1">IMPORT</div>
-                        <div id="import" class="text-2xl font-bold text-red-400 tabular-nums">0 W</div>
+                        <div class="text-[11px] text-red-400 tracking-widest mb-1" aria-label="Importing from grid">↓ IMPORT</div>
+                        <div id="import" class="text-2xl font-bold text-red-400 tabular-nums" aria-live="polite">0 W</div>
                     </div>
                 </div>
             </div>
@@ -764,41 +777,49 @@
                     <div class="grid grid-cols-1 gap-3">
                         <!-- Total usage -->
                         <div>
-                            <div class="text-[10px] text-white/35 mb-1.5 tracking-wide">⚡ TOTAL USAGE (kWh consumed today)</div>
+                            <div class="text-[11px] text-white/60 mb-1.5 tracking-wide font-medium">⚡ TOTAL USAGE (kWh consumed today)</div>
                             <div class="flex gap-2">
                                 <input id="dailyUsageInput" type="number" min="0" max="200" step="0.1"
                                        placeholder="e.g. 12.5 kWh"
+                                       aria-label="Total daily usage in kWh"
+                                       oninput="previewSelfSufficiency()"
                                        class="solar-input rounded-xl px-3 py-2 text-sm flex-1 min-w-0">
-                                <button onclick="setDailyUsage()"
+                                <button onclick="setDailyUsage()" aria-label="Save total usage"
                                         class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 hover:opacity-90 transition-all whitespace-nowrap"
                                         style="background:linear-gradient(to right,#a78bfa,#22d3ee)">
                                     <i class="fas fa-floppy-disk mr-1"></i>Save
                                 </button>
-                                <button onclick="clearDailyUsage()"
+                                <button onclick="clearDailyUsage()" aria-label="Clear usage"
                                         class="px-3 py-2 rounded-xl bg-white/10 text-xs font-semibold hover:bg-white/15 transition-all">
                                     <i class="fas fa-xmark"></i>
                                 </button>
                             </div>
-                            <div id="dailyUsageInfo" class="text-[10px] text-white/30 mt-1">Estimated: 0.0 kWh</div>
+                            <div id="dailyUsageInfo" class="text-[10px] text-white/50 mt-1">Estimated: 0.0 kWh</div>
                         </div>
                         <!-- Grid import -->
                         <div>
-                            <div class="text-[10px] text-white/35 mb-1.5 tracking-wide">⬇️ GRID IMPORT (kWh from meter)</div>
+                            <div class="text-[11px] text-white/60 mb-1.5 tracking-wide font-medium">↓ GRID IMPORT (kWh from meter)</div>
                             <div class="flex gap-2">
                                 <input id="dailyImportInput" type="number" min="0" max="100" step="0.1"
                                        placeholder="e.g. 5.5 kWh"
+                                       aria-label="Grid import in kWh"
+                                       oninput="previewSelfSufficiency()"
                                        class="solar-input rounded-xl px-3 py-2 text-sm flex-1 min-w-0">
-                                <button onclick="setDailyImport()"
+                                <button onclick="setDailyImport()" aria-label="Save import"
                                         class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-900 hover:opacity-90 transition-all whitespace-nowrap"
                                         style="background:linear-gradient(to right,#34d399,#22d3ee)">
                                     <i class="fas fa-floppy-disk mr-1"></i>Save
                                 </button>
-                                <button onclick="clearDailyImport()"
+                                <button onclick="clearDailyImport()" aria-label="Clear import"
                                         class="px-3 py-2 rounded-xl bg-white/10 text-xs font-semibold hover:bg-white/15 transition-all">
                                     <i class="fas fa-xmark"></i>
                                 </button>
                             </div>
-                            <div id="dailyImportInfo" class="text-[10px] text-white/30 mt-1">Estimated: 0.0 kWh</div>
+                            <div id="dailyImportInfo" class="text-[10px] text-white/50 mt-1">Estimated: 0.0 kWh</div>
+                        </div>
+                        <!-- Preview -->
+                        <div id="meterPreview" class="hidden text-[11px] text-emerald-300 rounded-xl px-3 py-2" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.18)">
+                            Preview: <span id="meterPreviewText">—</span>
                         </div>
                     </div>
                 </div>
@@ -822,10 +843,11 @@
                 </div>
                 <!-- 7-day chart -->
                 <div class="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06]">
-                    <div class="flex items-center gap-3 mb-2 text-[10px] text-white/35">
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar kWh</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import kWh</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost XCG</span>
+                    <div class="flex flex-wrap items-center gap-3 mb-2 text-[10px] text-white/35">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-orange-400 inline-block"></span>Usage</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost</span>
                     </div>
                     <div class="flex gap-1 h-28 items-end" id="chart7Bars"></div>
                 </div>
@@ -853,10 +875,11 @@
                 </div>
                 <!-- 30-day chart -->
                 <div class="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06]">
-                    <div class="flex items-center gap-3 mb-2 text-[10px] text-white/35">
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar kWh</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import kWh</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost XCG</span>
+                    <div class="flex flex-wrap items-center gap-3 mb-2 text-[10px] text-white/35">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-orange-400 inline-block"></span>Usage</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost</span>
                     </div>
                     <div class="flex gap-px h-24 items-end" id="chart30Bars"></div>
                 </div>
@@ -1005,7 +1028,10 @@ function saveSettings(){
     // Refresh derived labels
     const pl=document.getElementById("solarPeakLabel"); if(pl)pl.innerText=MAX_SOLAR+" W";
     const rl=document.getElementById("rateLabel"); if(rl)rl.innerText=RATE.toFixed(2)+" XCG/kWh";
-    closeSettings();
+    // Show save confirmation then close
+    const sv=document.getElementById("settingsSaved");
+    if(sv){sv.classList.remove("hidden");setTimeout(()=>{sv.classList.add("hidden");closeSettings();},900);}
+    else closeSettings();
     update();
 }
 function openSettings(){
@@ -1208,6 +1234,18 @@ function checkEveningAutoSave(){
     const localHour=((now.getUTCHours()-4)+24)%24+now.getUTCMinutes()/60;
     if(localHour>=18)eveningAutoSave();
 }
+function previewSelfSufficiency(){
+    const uVal=parseFloat(document.getElementById("dailyUsageInput").value);
+    const iVal=parseFloat(document.getElementById("dailyImportInput").value);
+    const usage=!isNaN(uVal)?uVal:(actualDailyUsageKwh!==null?actualDailyUsageKwh:(dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY));
+    const imp=!isNaN(iVal)?iVal:(actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh);
+    const pv=document.getElementById("meterPreview"),pt=document.getElementById("meterPreviewText");
+    if(pv&&pt&&(!isNaN(uVal)||!isNaN(iVal))){
+        const ss=usage>0?Math.round(Math.max(0,usage-imp)/usage*100):100;
+        pt.innerText=`${ss}% self-sufficient · cost ~${(imp*RATE).toFixed(2)} XCG`;
+        pv.classList.remove("hidden");
+    } else if(pv){pv.classList.add("hidden");}
+}
 function setDailyImport(){
     const el=document.getElementById("dailyImportInput"),v=parseFloat(el.value);
     if(isNaN(v)||v<0){el.classList.add("border-red-500");setTimeout(()=>el.classList.remove("border-red-500"),1200);return;}
@@ -1295,16 +1333,24 @@ function setKnmiStatus(s,src){
     document.getElementById("knmiDot").className="w-1.5 h-1.5 rounded-full inline-block "+(s==="ok"?"knmi-ok":s==="busy"?"knmi-busy pulse-dot":"knmi-err");
     document.getElementById("knmiTxt").innerText=s==="ok"?(src||'Weather')+' LIVE':s==="busy"?"Weather…":"No data";
 }
+let _prevPressure=null;
 function applyKnmiUI(d,src){
     const feels=(d.temp_c!==null&&d.rh!==null)?heatIndex(d.temp_c,d.rh):(d.temp_c||31);
     document.getElementById("wxFeels").innerText=(feels!==null?feels.toFixed(0):"—")+"°";
     document.getElementById("wxAir").innerText=d.temp_c!==null?d.temp_c.toFixed(1):"—";
     document.getElementById("wxDew").innerText=d.dew_c!==null?d.dew_c.toFixed(1):"—";
     document.getElementById("wxRh").innerText=d.rh!==null?d.rh.toFixed(0):"—";
+    document.getElementById("wxCloud").innerText=d.cloud_octa!==null?d.cloud_octa:"—";
     document.getElementById("wxCondition").innerText=o2l(d.cloud_octa);
     document.getElementById("wxIcon").innerText=o2i(d.cloud_octa);
     document.getElementById("outdoor").innerText=feels!==null?feels.toFixed(1)+"°C":"—°C";
-    document.getElementById("wxPressure").innerText=d.slp!==null?d.slp.toFixed(0)+" hPa":"— hPa";
+    if(d.slp!==null){
+        const trend=_prevPressure!==null?(d.slp>_prevPressure+0.3?'↑':d.slp<_prevPressure-0.3?'↓':'→'):'';
+        document.getElementById("wxPressure").innerText=d.slp.toFixed(0)+" hPa";
+        document.getElementById("wxPressureTrend").innerText=trend;
+        document.getElementById("wxPressureHint").innerText=trend==='↑'?'rising':trend==='↓'?'falling':'stable';
+        _prevPressure=d.slp;
+    }
     if(d.time)document.getElementById("wxObsTime").innerText="Obs: "+d.time;
     document.getElementById("wxWindKt").innerText=d.wind_kt!==null?d.wind_kt+" kt":"— kt";
     document.getElementById("wxWindDir").innerText=wdLabel(d.wind_dir,d.wind_sector);
@@ -1325,9 +1371,9 @@ function applyKnmiUI(d,src){
     const uvi=toUVI(d.radiation),ui=uviInfo(uvi);
     if(d.radiation!==null){
         document.getElementById("wxUvNum").innerText=uvi.toFixed(1);
-        document.getElementById("wxUvNum").className="text-3xl font-bold tabular-nums "+ui.cls;
+        document.getElementById("wxUvNum").className="text-[13px] font-bold tabular-nums "+ui.cls;
         document.getElementById("wxUvLabel").innerText=ui.lbl;
-        document.getElementById("wxUvLabel").className="text-[11px] font-semibold mt-0.5 "+ui.cls;
+        document.getElementById("wxUvLabel").className="text-[10px] font-semibold "+ui.cls;
         document.getElementById("uvCursor").style.left=`calc(${Math.min(100,uvi/13*100).toFixed(1)}% - 6px)`;
         document.getElementById("wxRadiation").innerText=d.radiation+" W/m²";
     } else {
@@ -1423,8 +1469,10 @@ function renderChart7(){
     const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
     const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
+    const maxUse=Math.max(...days.map(d=>d.total_kwh||0),1);
     const total7sol=days.reduce((a,d)=>a+d.solar_kwh,0);
     const total7cost=days.reduce((a,d)=>a+d.cost_xcg,0);
+    const total7use=days.reduce((a,d)=>a+(d.total_kwh||0),0);
     document.getElementById("st7Solar").innerText=total7sol.toFixed(1)+" kWh";
     document.getElementById("st7Cost").innerText=total7cost.toFixed(2)+" XCG";
     document.getElementById("st7Avg").innerText=(total7sol/days.length).toFixed(1)+" kWh";
@@ -1435,12 +1483,14 @@ function renderChart7(){
         col.className="chart-col";
         const sh=Math.max(2,d.solar_kwh/maxSol*100);
         const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
+        const uh=Math.max(2,(d.total_kwh||0)/maxUse*100);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const dayLabel=new Date(d.date).toLocaleDateString('en-US',{weekday:'short'});
         col.innerHTML=`<div class="chart-bars h-full items-end">
-            <div class="cbar" style="height:${sh}%;background:${isToday?'#34d399':'rgba(52,211,153,0.55)'}"></div>
-            <div class="cbar" style="height:${ih}%;background:${isToday?'#f87171':'rgba(248,113,113,0.5)'}"></div>
-            <div class="cbar" style="height:${ch}%;background:${d.cost_xcg<=0?'rgba(52,211,153,0.4)':isToday?'#fbbf24':'rgba(251,191,36,0.55)'}"></div>
+            <div class="cbar" style="height:${sh}%;background:${isToday?'#34d399':'rgba(52,211,153,0.55)'}" title="Solar ${d.solar_kwh.toFixed(1)} kWh"></div>
+            <div class="cbar" style="height:${uh}%;background:${isToday?'#fb923c':'rgba(251,146,60,0.5)'}" title="Usage ${(d.total_kwh||0).toFixed(1)} kWh"></div>
+            <div class="cbar" style="height:${ih}%;background:${isToday?'#f87171':'rgba(248,113,113,0.5)'}" title="Import ${(d.import_kwh||0).toFixed(1)} kWh"></div>
+            <div class="cbar" style="height:${ch}%;background:${d.cost_xcg<=0?'rgba(52,211,153,0.4)':isToday?'#fbbf24':'rgba(251,191,36,0.55)'}" title="Cost ${d.cost_xcg.toFixed(2)} XCG"></div>
         </div>
         <div class="chart-lbl ${isToday?'today':''}">${dayLabel}</div>`;
         c.appendChild(col);
@@ -1452,6 +1502,7 @@ function renderChart30(){
     const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
     const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
+    const maxUse=Math.max(...days.map(d=>d.total_kwh||0),1);
     const total=days.reduce((a,d)=>({sol:a.sol+d.solar_kwh,cost:a.cost+d.cost_xcg}),{sol:0,cost:0});
     document.getElementById("st30Solar").innerText=total.sol.toFixed(0)+" kWh";
     document.getElementById("st30Cost").innerText=total.cost.toFixed(1)+" XCG";
@@ -1463,11 +1514,13 @@ function renderChart30(){
     days.forEach(d=>{
         const isToday=d.date===new Date().toDateString();
         const sh=Math.max(2,d.solar_kwh/maxSol*100);
+        const uh=Math.max(2,(d.total_kwh||0)/maxUse*100);
         const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const col=document.createElement("div");col.className="chart-col";
         col.innerHTML=`<div class="chart-bars h-full items-end">
             <div class="cbar" style="height:${sh}%;background:${isToday?'#34d399':'rgba(52,211,153,0.45)'}"></div>
+            <div class="cbar" style="height:${uh}%;background:${isToday?'#fb923c':'rgba(251,146,60,0.4)'}"></div>
             <div class="cbar" style="height:${ih}%;background:${isToday?'#f87171':'rgba(248,113,113,0.4)'}"></div>
             <div class="cbar" style="height:${ch}%;background:${d.cost_xcg<=0?'rgba(52,211,153,0.35)':isToday?'#fbbf24':'rgba(251,191,36,0.45)'}"></div>
         </div>`;
@@ -1573,8 +1626,8 @@ function update(){
     gEl.innerText=(net>=0?"+":"")+net+" W";
     gEl.className="text-4xl font-bold tabular-nums "+(net>=0?"text-emerald-400":"text-red-400");
     document.getElementById("status").innerHTML=net>0
-        ?`<span class="text-emerald-400">EXPORTING</span> <span class="font-mono text-white/50">+${expW} W</span>`
-        :`<span class="text-red-400">IMPORTING</span> <span class="font-mono text-white/50">${impW} W</span>`;
+        ?`<span class="text-emerald-400">↑ EXPORTING</span> <span class="font-mono text-white/50">+${expW} W</span>`
+        :`<span class="text-red-400">↓ IMPORTING</span> <span class="font-mono text-white/50">${impW} W</span>`;
     document.getElementById("export").innerText=expW+" W";
     document.getElementById("import").innerText=impW+" W";
     const gc=document.getElementById("gridCard");
