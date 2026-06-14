@@ -159,6 +159,16 @@
 
         /* KNMI */
         .knmi-ok{background:#34d399} .knmi-busy{background:#fbbf24} .knmi-err{background:#f87171}
+
+        /* auto-save toast */
+        #autoSaveToast{
+            position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+            background:rgba(14,20,46,0.96);border:1px solid rgba(52,211,153,0.35);
+            color:#34d399;font-size:12px;font-weight:600;padding:10px 18px;border-radius:99px;
+            backdrop-filter:blur(12px);z-index:200;pointer-events:none;
+            opacity:0;transition:opacity 0.4s ease;
+        }
+        #autoSaveToast.show{opacity:1;}
     </style>
 </head>
 <body>
@@ -834,6 +844,7 @@
     </div>
 
 </div><!-- /above-bg -->
+<div id="autoSaveToast">✓ Daily stats auto-saved at 6 PM</div>
 
 <script>
 /* ═══════════════════════════════════════════════════════
@@ -985,6 +996,7 @@ let dailySolarKwh=0, dailyAcKwh=0, dailyImportKwh=0, dailyExportKwh=0;
 let actualDailySolarKwh=null; // user-entered actual solar production for stats
 let actualDailyImportKwh=null; // user-entered actual import for stats
 let actualDailyUsageKwh=null;  // user-entered actual total usage for stats
+let _autoSavedDate=null;       // tracks which day the 6pm auto-save already ran
 let knmiData=null, manualSolarW=null, manualSolarTime=null;
 let solarHistory=new Array(20).fill(0);
 let statsData=[];
@@ -994,7 +1006,7 @@ let currentStatsTab='day';
    PERSISTENCE — APP STATE
 ═══════════════════════════════════════════════════════ */
 function saveState(){
-    try{localStorage.setItem("powerDash",JSON.stringify({acMode,setpoint,manualSolarW,manualSolarTime,dailySolarKwh,dailyAcKwh,dailyImportKwh,dailyExportKwh,actualDailySolarKwh,actualDailyImportKwh,actualDailyUsageKwh,day:new Date().toDateString()}));}catch(e){}
+    try{localStorage.setItem("powerDash",JSON.stringify({acMode,setpoint,manualSolarW,manualSolarTime,dailySolarKwh,dailyAcKwh,dailyImportKwh,dailyExportKwh,actualDailySolarKwh,actualDailyImportKwh,actualDailyUsageKwh,_autoSavedDate,day:new Date().toDateString()}));}catch(e){}
 }
 function loadState(){
     try{
@@ -1008,6 +1020,7 @@ function loadState(){
             actualDailySolarKwh=typeof s.actualDailySolarKwh==='number'?s.actualDailySolarKwh:null;
             actualDailyImportKwh=typeof s.actualDailyImportKwh==='number'?s.actualDailyImportKwh:null;
             actualDailyUsageKwh=typeof s.actualDailyUsageKwh==='number'?s.actualDailyUsageKwh:null;
+            _autoSavedDate=s._autoSavedDate||null;
             if(typeof s.manualSolarW==='number'){manualSolarW=s.manualSolarW;manualSolarTime=s.manualSolarTime||Date.now();}
         } else if(s.day && (s.dailySolarKwh||0)>0){
             // Day rolled over — archive the previous day before counters reset to 0
@@ -1119,17 +1132,52 @@ function updateSolarDaily(){
 function setDailyUsage(){
     const el=document.getElementById("dailyUsageInput"),v=parseFloat(el.value);
     if(isNaN(v)||v<0){el.classList.add("border-red-500");setTimeout(()=>el.classList.remove("border-red-500"),1200);return;}
-    actualDailyUsageKwh=Math.round(v*10)/10;el.value="";saveState();updateDailyUsage();update();
+    actualDailyUsageKwh=Math.round(v*10)/10;el.dataset.manual="1";el.value="";saveState();updateDailyUsage();update();
 }
 function clearDailyUsage(){actualDailyUsageKwh=null;saveState();updateDailyUsage();update();}
 function updateDailyUsage(){
     const est=dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY;
     const info=document.getElementById("dailyUsageInfo");
     if(actualDailyUsageKwh!==null){
-        info.innerText=`✓ Actual: ${actualDailyUsageKwh} kWh (estimated was ${est.toFixed(1)} kWh)`;
+        const tag=_autoSavedDate===new Date().toDateString()&&!document.getElementById("dailyUsageInput").dataset.manual?
+            ' (auto)':' (entered)';
+        info.innerText=`✓ ${actualDailyUsageKwh} kWh${tag} — estimated was ${est.toFixed(1)} kWh`;
     } else {
-        info.innerText=`Estimated: ${est.toFixed(1)} kWh (AC + fridge + other)`;
+        info.innerText=`Estimated: ${est.toFixed(1)} kWh — auto-saves at 6 PM`;
     }
+}
+
+// ── Evening auto-save: locks in daily totals at 6 PM if user hasn't entered them ──
+function showAutoSaveToast(){
+    const el=document.getElementById("autoSaveToast");
+    el.classList.add("show");
+    setTimeout(()=>el.classList.remove("show"),4000);
+}
+function eveningAutoSave(){
+    const today=new Date().toDateString();
+    if(_autoSavedDate===today)return; // already done today
+    _autoSavedDate=today;
+    let changed=false;
+    if(actualDailyUsageKwh===null){
+        actualDailyUsageKwh=+Math.max(0,dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY).toFixed(2);
+        changed=true;
+    }
+    if(actualDailySolarKwh===null&&dailySolarKwh>0.05){
+        actualDailySolarKwh=+dailySolarKwh.toFixed(2);
+        changed=true;
+    }
+    if(actualDailyImportKwh===null&&dailyImportKwh>0.01){
+        actualDailyImportKwh=+dailyImportKwh.toFixed(2);
+        changed=true;
+    }
+    saveState(); saveStats();
+    updateSolarDaily(); updateDailyUsage(); updateDailyImport();
+    if(changed)showAutoSaveToast();
+}
+function checkEveningAutoSave(){
+    const now=new Date();
+    const localHour=((now.getUTCHours()-4)+24)%24+now.getUTCMinutes()/60;
+    if(localHour>=18)eveningAutoSave();
 }
 function setDailyImport(){
     const el=document.getElementById("dailyImportInput"),v=parseFloat(el.value);
@@ -1544,6 +1592,7 @@ async function initialize(){
     loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
     updateSolarDaily(); updateDailyImport(); updateDailyUsage(); // init daily displays
+    checkEveningAutoSave(); // catch case where app opened after 6 PM
     document.getElementById("solarManualInput").addEventListener("keydown",e=>{if(e.key==="Enter")applyManualSolar();});
     document.getElementById("solarDailyInput").addEventListener("keydown",e=>{if(e.key==="Enter")setSolarDaily();});
     document.getElementById("dailyUsageInput").addEventListener("keydown",e=>{if(e.key==="Enter")setDailyUsage();});
@@ -1553,7 +1602,7 @@ async function initialize(){
     loadWeatherCache(); // show last known weather instantly while fresh fetch loads
     updateClock(); setInterval(updateClock,1000);
     update(); setInterval(update,1200);
-    setInterval(()=>{saveState();saveStats();},10000);
+    setInterval(()=>{saveState();saveStats();checkEveningAutoSave();},10000);
     fetchKnmi(); setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
 }
 window.onload=initialize;
