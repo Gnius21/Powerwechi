@@ -1491,13 +1491,17 @@ function outdoorFeelsLike(){
 }
 function solar(){
     if(manualSolarW!==null)return manualSolarW;
+    // Prefer KNMI radiation when available (direct measurement)
+    if(knmiData&&knmiData.radiation!=null&&knmiData.radiation>0){
+        return Math.round(knmiData.radiation*MAX_SOLAR/1000*0.88);
+    }
+    // Fallback: sun position estimate (no KNMI radiation)
     if(knmiData&&knmiData.temp_c!==null){
         const cloudCover=knmiData.cloud_octa!=null?knmiData.cloud_octa*12.5:0;
         return calcSolarFromSunPosition(MAX_SOLAR,cloudCover);
     }
-    // Fallback: sun position estimate (no cloud data)
-    const cloudCover=0;
-    return calcSolarFromSunPosition(MAX_SOLAR,cloudCover);
+    // No weather data: pure sun position
+    return calcSolarFromSunPosition(MAX_SOLAR,0);
 }
 function acPower(ind,out){
     if(!acMode)return 8;
