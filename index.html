@@ -652,7 +652,7 @@
                     <i class="fas fa-coins text-3xl text-yellow-400"></i>
                     <div>
                         <div class="text-[15px] font-bold">Today's Cost</div>
-                        <div class="text-[11px] text-white/40">0.68 XCG/kWh</div>
+                        <div id="rateLabel" class="text-[11px] text-white/40">0.68 XCG/kWh</div>
                     </div>
                 </div>
                 <div id="daily" class="text-4xl font-bold text-yellow-400 tabular-nums">0.00 XCG</div>
@@ -730,11 +730,18 @@
                     </div>
                 </div>
 
+                <!-- Self-sufficiency banner -->
+                <div class="mt-3 rounded-xl px-3 py-2 flex items-center justify-between" style="background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.15)">
+                    <span class="text-[10px] text-white/35 tracking-widest">⚡ SELF-SUFFICIENCY</span>
+                    <span id="stTodaySelfSuf" class="text-[13px] font-bold text-emerald-400">— %</span>
+                </div>
+
                 <!-- Daily meter readings for stats override -->
-                <div class="bg-white/[0.04] rounded-2xl p-3 border border-white/[0.07] mt-4">
-                    <div class="text-[11px] text-white/40 mb-3 flex items-center gap-2">
-                        <i class="fas fa-meter text-purple-400 text-xs"></i>
-                        DAILY METER READINGS (overrides estimates in stats)
+                <div class="rounded-2xl p-3 mt-4" style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.28)">
+                    <div class="text-[12px] font-semibold text-purple-300 mb-3 flex items-center gap-2">
+                        <i class="fas fa-meter text-purple-400"></i>
+                        DAILY METER READINGS
+                        <span class="text-[10px] font-normal text-white/35 ml-1">overrides estimates</span>
                     </div>
                     <div class="grid grid-cols-1 gap-3">
                         <!-- Total usage -->
@@ -799,6 +806,7 @@
                 <div class="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06]">
                     <div class="flex items-center gap-3 mb-2 text-[10px] text-white/35">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar kWh</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import kWh</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost XCG</span>
                     </div>
                     <div class="flex gap-1 h-28 items-end" id="chart7Bars"></div>
@@ -829,6 +837,7 @@
                 <div class="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06]">
                     <div class="flex items-center gap-3 mb-2 text-[10px] text-white/35">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400 inline-block"></span>Solar kWh</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import kWh</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost XCG</span>
                     </div>
                     <div class="flex gap-px h-24 items-end" id="chart30Bars"></div>
@@ -966,6 +975,7 @@ function loadSettings(){
         }
     }catch(e){}
     recomputeDerived();
+    const rl=document.getElementById("rateLabel"); if(rl)rl.innerText=RATE.toFixed(2)+" XCG/kWh";
 }
 function saveSettings(){
     RATE=Math.max(0,parseFloat(document.getElementById("setRate").value)||RATE);
@@ -974,8 +984,9 @@ function saveSettings(){
     FRIDGE_RUN_W=Math.max(20,parseFloat(document.getElementById("setFridge").value)||FRIDGE_RUN_W);
     try{localStorage.setItem("powerSettings",JSON.stringify({RATE,EXPORT_RATE,MAX_SOLAR,FRIDGE_RUN_W}));}catch(e){}
     recomputeDerived();
-    // Refresh peak-label text and re-run
+    // Refresh derived labels
     const pl=document.getElementById("solarPeakLabel"); if(pl)pl.innerText=MAX_SOLAR+" W";
+    const rl=document.getElementById("rateLabel"); if(rl)rl.innerText=RATE.toFixed(2)+" XCG/kWh";
     closeSettings();
     update();
 }
@@ -1391,16 +1402,23 @@ function setStatsTab(tab){
 
 function renderStatsToday(){
     const yest=statsData.length>0?statsData[statsData.length-1]:null;
-    document.getElementById("stTodaySolar").innerText=dailySolarKwh.toFixed(1)+" kWh";
-    const cost=+(dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE);
+    const solDisplay=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
+    const impDisplay=actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh;
+    const totDisplay=actualDailyUsageKwh!==null?actualDailyUsageKwh:(dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY);
+    const expDisplay=Math.max(0,solDisplay-totDisplay+impDisplay);
+    const cost=+(impDisplay*RATE-expDisplay*EXPORT_RATE);
+    document.getElementById("stTodaySolar").innerText=solDisplay.toFixed(1)+" kWh"+(actualDailySolarKwh!==null?' ✓':'');
     document.getElementById("stTodayCost").innerText=cost.toFixed(2)+" XCG";
-    document.getElementById("stTodayExport").innerText=dailyExportKwh.toFixed(1)+" kWh";
-    document.getElementById("stTodayImport").innerText=dailyImportKwh.toFixed(1)+" kWh";
+    document.getElementById("stTodayExport").innerText=expDisplay.toFixed(1)+" kWh";
+    document.getElementById("stTodayImport").innerText=impDisplay.toFixed(1)+" kWh"+(actualDailyImportKwh!==null?' ✓':'');
     document.getElementById("stTodayAc").innerText=dailyAcKwh.toFixed(1)+" kWh";
     document.getElementById("stTodayFridge").innerText=FRIDGE_DAILY.toFixed(1)+" kWh";
     document.getElementById("stTodayOther").innerText=OTHER_DAILY.toFixed(1)+" kWh";
+    const selfSuf=totDisplay>0?Math.round(Math.max(0,totDisplay-impDisplay)/totDisplay*100):100;
+    const ssEl=document.getElementById("stTodaySelfSuf");
+    if(ssEl)ssEl.innerText=selfSuf+"% self-sufficient";
     if(yest){
-        const dSol=dailySolarKwh-yest.solar_kwh;
+        const dSol=solDisplay-yest.solar_kwh;
         document.getElementById("stTodaySolarVsYest").innerHTML=(dSol>=0?'<span class="text-emerald-400">↑ +':'<span class="text-red-400">↓ ')+Math.abs(dSol).toFixed(1)+" kWh</span> vs yesterday";
         const dCost=cost-yest.cost_xcg;
         document.getElementById("stTodayCostVsYest").innerHTML=(dCost<=0?'<span class="text-emerald-400">↓ -':'<span class="text-red-400">↑ +')+Math.abs(dCost).toFixed(2)+" XCG</span> vs yesterday";
@@ -1411,6 +1429,7 @@ function renderChart7(){
     const days=statsData.slice(-7);
     const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
+    const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
     const total7sol=days.reduce((a,d)=>a+d.solar_kwh,0);
     const total7cost=days.reduce((a,d)=>a+d.cost_xcg,0);
     document.getElementById("st7Solar").innerText=total7sol.toFixed(1)+" kWh";
@@ -1422,10 +1441,12 @@ function renderChart7(){
         const col=document.createElement("div");
         col.className="chart-col";
         const sh=Math.max(2,d.solar_kwh/maxSol*100);
+        const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const dayLabel=new Date(d.date).toLocaleDateString('en-US',{weekday:'short'});
         col.innerHTML=`<div class="chart-bars h-full items-end">
             <div class="cbar" style="height:${sh}%;background:${isToday?'#34d399':'rgba(52,211,153,0.55)'}"></div>
+            <div class="cbar" style="height:${ih}%;background:${isToday?'#f87171':'rgba(248,113,113,0.5)'}"></div>
             <div class="cbar" style="height:${ch}%;background:${d.cost_xcg<=0?'rgba(52,211,153,0.4)':isToday?'#fbbf24':'rgba(251,191,36,0.55)'}"></div>
         </div>
         <div class="chart-lbl ${isToday?'today':''}">${dayLabel}</div>`;
@@ -1437,6 +1458,7 @@ function renderChart30(){
     const days=statsData.slice(-30);
     const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
+    const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
     const total=days.reduce((a,d)=>({sol:a.sol+d.solar_kwh,cost:a.cost+d.cost_xcg}),{sol:0,cost:0});
     document.getElementById("st30Solar").innerText=total.sol.toFixed(0)+" kWh";
     document.getElementById("st30Cost").innerText=total.cost.toFixed(1)+" XCG";
@@ -1448,10 +1470,12 @@ function renderChart30(){
     days.forEach(d=>{
         const isToday=d.date===new Date().toDateString();
         const sh=Math.max(2,d.solar_kwh/maxSol*100);
+        const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const col=document.createElement("div");col.className="chart-col";
         col.innerHTML=`<div class="chart-bars h-full items-end">
             <div class="cbar" style="height:${sh}%;background:${isToday?'#34d399':'rgba(52,211,153,0.45)'}"></div>
+            <div class="cbar" style="height:${ih}%;background:${isToday?'#f87171':'rgba(248,113,113,0.4)'}"></div>
             <div class="cbar" style="height:${ch}%;background:${d.cost_xcg<=0?'rgba(52,211,153,0.35)':isToday?'#fbbf24':'rgba(251,191,36,0.45)'}"></div>
         </div>`;
         c.appendChild(col);
@@ -1505,12 +1529,13 @@ function update(){
     dailySolarKwh+=sol/1000*tick; dailyAcKwh+=ac/1000*tick;
     dailyImportKwh+=impW/1000*tick; dailyExportKwh+=expW/1000*tick;
 
-    // Cost projections
+    // Cost projections (for monthly estimate) + running actual cost
     const acDayEst=acMode?AC_PROFILES[setpoint].dailyKwh:0.2;
     const solEst=Math.max(dailySolarKwh,3.5);
     const netDay=acDayEst+FRIDGE_DAILY+OTHER_DAILY-solEst;
-    const dailyCost=netDay*RATE;
+    const dailyCost=netDay*RATE; // projection only (used for 30-day estimate)
     const worstDay=(AC_PROFILES[26].dailyKwh+FRIDGE_DAILY+OTHER_DAILY-solEst)*RATE;
+    const runningCost=dailyImportKwh*RATE-dailyExportKwh*EXPORT_RATE; // actual running cost
 
     // Solar
     document.getElementById("solar").innerText=sol+" W";
@@ -1574,10 +1599,10 @@ function update(){
     updateFlowCard(sol,house,net);
 
     // Cost
-    document.getElementById("daily").innerText=dailyCost.toFixed(2)+" XCG";
+    document.getElementById("daily").innerText=runningCost.toFixed(2)+" XCG";
     document.getElementById("monthly").innerText=(dailyCost*30).toFixed(1)+" XCG";
     document.getElementById("savings").innerText=Math.max(0,(worstDay-dailyCost)*30).toFixed(0)+" XCG saved";
-    document.getElementById("dailyTrend").innerHTML=dailyCost<=0
+    document.getElementById("dailyTrend").innerHTML=runningCost<=0
         ?`<i class="fas fa-arrow-down mr-1"></i>EARNING FROM SOLAR`
         :`<i class="fas fa-bolt mr-1"></i>${acMode?"AC AT "+setpoint+"°C":"AC OFF — LOWEST COST"}`;
 
