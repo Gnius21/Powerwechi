@@ -849,7 +849,7 @@
     </div><!-- /container -->
 
     <div class="text-center text-[11px] text-white/20 pb-6">
-        Weather · KNMI Bonaire / Open-Meteo Curaçao · Solar = radiation × panel efficiency
+        Weather · KNMI Bonaire / Open-Meteo Curaçao · Solar PV from measured radiation
     </div>
 
 </div><!-- /above-bg -->
@@ -1247,30 +1247,6 @@ function buildRain(intensity){
 /* ═══════════════════════════════════════════════════════
    SOLAR POSITION CALCULATION
 ═══════════════════════════════════════════════════════ */
-function calcSolarElevation(){
-    const now=new Date(),lat=12.17,lng=-68.99;
-    const J=now.getUTCFullYear(),M=now.getUTCMonth()+1,D=now.getUTCDate();
-    const n=Math.floor(275*M/9)-Math.floor((M+9)/12)*2+D-30; // day of year
-    const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(n-81)/365); // declination
-    const h_utc=now.getUTCHours()+now.getUTCMinutes()/60+now.getUTCSeconds()/3600;
-    const h_local=h_utc-4; // Curaçao UTC-4
-    // Longitude correction: Curaçao (68.99°W) is 8.99° west of UTC-4 meridian (60°W)
-    // → true solar noon is 35.96 min LATER than clock noon
-    const lng_corr=(68.99-60)/15; // ~0.5993 hours
-    const H=Math.PI/12*(h_local-12-lng_corr); // hour angle from true solar noon
-    const lat_rad=lat*Math.PI/180;
-    const sinElev=Math.sin(lat_rad)*Math.sin(dec)+Math.cos(lat_rad)*Math.cos(dec)*Math.cos(H);
-    return Math.asin(Math.max(0,sinElev))*180/Math.PI;
-}
-function calcSolarFromSunPosition(maxW,cloudCover){
-    const elev=calcSolarElevation();
-    if(elev<=0)return 0;
-    // Air-mass attenuation + 0.88 tropical de-rating (temp losses, inverter, wiring)
-    const clearSky=Math.pow(Math.sin(elev*Math.PI/180),1.5)*maxW*0.88;
-    // Clouds reduce output; haze/diffuse light means even 100% cloud ≠ 0 output
-    const cloudFac=1-((cloudCover||0)/100)*0.65;
-    return Math.round(clearSky*cloudFac);
-}
 
 /* ═══════════════════════════════════════════════════════
    KNMI FETCH + UI
