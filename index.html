@@ -1210,14 +1210,13 @@ function updateSolarSourceUI(){
         const m=Math.floor((Date.now()-manualSolarTime)/60000);
         src.innerText="Manual inverter reading";
         info.innerHTML=`<span class="text-emerald-400">✓ ${manualSolarW} W</span> (${m<1?"just now":m+" min ago"}) — press Auto to use KNMI.`;
-    } else if(knmiData&&knmiData.temp_c!==null){
-        src.innerText=`From sun position (${_wxSrc||'weather'})`;
-        const cc=knmiData.cloud_octa!=null?knmiData.cloud_octa*12.5:0;
-        const estimate=calcSolarFromSunPosition(MAX_SOLAR,cc);
-        info.innerText=`${_wxSrc||'Weather'}: ~${estimate} W estimated. KNMI radiation${knmiData.radiation!=null?' ('+knmiData.radiation+' W/m²)':''} shown below.`;
+    } else if(knmiData&&knmiData.radiation!=null&&knmiData.radiation>0){
+        src.innerText=`From radiation (${_wxSrc||'weather'})`;
+        const estimate=Math.round(knmiData.radiation*MAX_SOLAR/1000*0.88);
+        info.innerText=`${_wxSrc||'Weather'} radiation ${knmiData.radiation} W/m² → ~${estimate} W panel output.`;
     } else {
-        src.innerText="Estimating (weather connecting…)";
-        info.innerText="Waiting for weather data. Enter your inverter reading above for accurate output.";
+        src.innerText="Waiting for radiation data…";
+        info.innerText="No radiation reading yet. Enter your inverter reading above for accurate output.";
     }
 }
 
@@ -1491,17 +1490,12 @@ function outdoorFeelsLike(){
 }
 function solar(){
     if(manualSolarW!==null)return manualSolarW;
-    // Prefer KNMI radiation when available (direct measurement)
+    // Drive solar PV from measured radiation (W/m²) → panel watts
     if(knmiData&&knmiData.radiation!=null&&knmiData.radiation>0){
         return Math.round(knmiData.radiation*MAX_SOLAR/1000*0.88);
     }
-    // Fallback: sun position estimate (no KNMI radiation)
-    if(knmiData&&knmiData.temp_c!==null){
-        const cloudCover=knmiData.cloud_octa!=null?knmiData.cloud_octa*12.5:0;
-        return calcSolarFromSunPosition(MAX_SOLAR,cloudCover);
-    }
-    // No weather data: pure sun position
-    return calcSolarFromSunPosition(MAX_SOLAR,0);
+    // No radiation data yet (or night / zero) → no output
+    return 0;
 }
 function acPower(ind,out){
     if(!acMode)return 8;
