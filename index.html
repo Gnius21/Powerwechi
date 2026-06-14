@@ -920,7 +920,13 @@ function loadWeatherCache(){
 }
 
 async function fetchKnmiPage(){
-    const proxies=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://r.jina.ai/'+u,u=>u];
+    const proxies=[
+        u=>'https://corsproxy.io/?url='+encodeURIComponent(u),
+        u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+        u=>'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u),
+        u=>'https://r.jina.ai/'+u,
+        u=>u
+    ];
     try{
         return await Promise.any(proxies.map(async w=>{
             const c=new AbortController(),t=setTimeout(()=>c.abort(),2500);
@@ -1659,6 +1665,12 @@ function update(){
    INIT
 ═══════════════════════════════════════════════════════ */
 async function initialize(){
+    // Kick off the weather network request FIRST so it races in parallel
+    // with the rest of setup instead of waiting behind it.
+    loadWeatherCache();        // show last known weather instantly (if fresh)
+    fetchKnmi();               // start live fetch immediately
+    setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
+
     loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
     updateSolarDaily(); updateDailyImport(); updateDailyUsage(); // init daily displays
@@ -1669,13 +1681,14 @@ async function initialize(){
     document.getElementById("dailyImportInput").addEventListener("keydown",e=>{if(e.key==="Enter")setDailyImport();});
     setMode(acMode); setSetpoint(setpoint);
     buildHistBars();
-    loadWeatherCache(); // show last known weather instantly while fresh fetch loads
     updateClock(); setInterval(updateClock,1000);
     update(); setInterval(update,1200);
     setInterval(()=>{saveState();saveStats();checkEveningAutoSave();},10000);
-    fetchKnmi(); setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
 }
-window.onload=initialize;
+// Script is at end of <body>, so DOM is already parsed — run now instead of
+// waiting for window.onload (which blocks on all CDN/font downloads).
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+else initialize();
 
 /* ═══════════════════════════════════════════════════════
    PWA — service worker + wake lock + install prompt
