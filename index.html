@@ -842,11 +842,27 @@
 const KNMI_URL='https://www.knmidc.org/weather/bonaire/?Current';
 
 // Race all 3 proxies in parallel — use whichever responds first (faster than sequential)
+function saveWeatherCache(data,src){
+    try{localStorage.setItem('wxCache',JSON.stringify({data,src,ts:Date.now()}));}catch(e){}
+}
+function loadWeatherCache(){
+    try{
+        const c=JSON.parse(localStorage.getItem('wxCache'));
+        if(c&&c.data&&c.data.temp_c!==null&&(Date.now()-c.ts)<20*60*1000){
+            knmiData=c.data;_wxSrc=c.src||'cached';
+            applyKnmiUI(c.data,_wxSrc);
+            setKnmiStatus("ok",_wxSrc);
+            return true;
+        }
+    }catch(e){}
+    return false;
+}
+
 async function fetchKnmiPage(){
     const proxies=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://r.jina.ai/'+u,u=>u];
     try{
         return await Promise.any(proxies.map(async w=>{
-            const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);
+            const c=new AbortController(),t=setTimeout(()=>c.abort(),4000);
             try{
                 const r=await fetch(w(KNMI_URL),{signal:c.signal});clearTimeout(t);
                 if(!r.ok)throw new Error('!ok');
@@ -865,7 +881,7 @@ async function fetchOpenMeteo(){
             '&current=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,' +
             'wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,pressure_msl,shortwave_radiation' +
             '&wind_speed_unit=kn&timezone=America%2FCuracao&forecast_days=1';
-        const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);
+        const c=new AbortController(),t=setTimeout(()=>c.abort(),3000);
         const r=await fetch(url,{signal:c.signal});clearTimeout(t);
         if(!r.ok)return null;
         const j=await r.json(),cur=j.current;
@@ -1179,17 +1195,22 @@ function calcSolarElevation(){
     const n=Math.floor(275*M/9)-Math.floor((M+9)/12)*2+D-30; // day of year
     const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(n-81)/365); // declination
     const h_utc=now.getUTCHours()+now.getUTCMinutes()/60+now.getUTCSeconds()/3600;
-    const h_local=h_utc-4; // Curaçao is UTC-4
-    const H=Math.PI/12*(h_local-12); // hour angle (15° per hour)
+    const h_local=h_utc-4; // Curaçao UTC-4
+    // Longitude correction: Curaçao (68.99°W) is 8.99° west of UTC-4 meridian (60°W)
+    // → true solar noon is 35.96 min LATER than clock noon
+    const lng_corr=(68.99-60)/15; // ~0.5993 hours
+    const H=Math.PI/12*(h_local-12-lng_corr); // hour angle from true solar noon
     const lat_rad=lat*Math.PI/180;
     const sinElev=Math.sin(lat_rad)*Math.sin(dec)+Math.cos(lat_rad)*Math.cos(dec)*Math.cos(H);
     return Math.asin(Math.max(0,sinElev))*180/Math.PI;
 }
 function calcSolarFromSunPosition(maxW,cloudCover){
     const elev=calcSolarElevation();
-    if(elev<=0)return 0; // night
-    const clearSky=Math.pow(Math.sin(elev*Math.PI/180),1.5)*maxW; // AM relative mass effect
-    const cloudFac=1-((cloudCover||0)/100)*0.75; // clouds reduce by up to 75%
+    if(elev<=0)return 0;
+    // Air-mass attenuation + 0.88 tropical de-rating (temp losses, inverter, wiring)
+    const clearSky=Math.pow(Math.sin(elev*Math.PI/180),1.5)*maxW*0.88;
+    // Clouds reduce output; haze/diffuse light means even 100% cloud ≠ 0 output
+    const cloudFac=1-((cloudCover||0)/100)*0.65;
     return Math.round(clearSky*cloudFac);
 }
 
@@ -1215,6 +1236,7 @@ async function fetchKnmi(){
         knmiData=res.data; _wxSrc=res.src;
         applyKnmiUI(res.data,res.src);
         setKnmiStatus("ok",res.src);
+        saveWeatherCache(res.data,res.src);
     }catch(e){setKnmiStatus("err");}
 }
 function setKnmiStatus(s,src){
@@ -1528,10 +1550,11 @@ async function initialize(){
     document.getElementById("dailyImportInput").addEventListener("keydown",e=>{if(e.key==="Enter")setDailyImport();});
     setMode(acMode); setSetpoint(setpoint);
     buildHistBars();
+    loadWeatherCache(); // show last known weather instantly while fresh fetch loads
     updateClock(); setInterval(updateClock,1000);
     update(); setInterval(update,1200);
     setInterval(()=>{saveState();saveStats();},10000);
-    fetchKnmi(); setInterval(fetchKnmi,10*60*1000);
+    fetchKnmi(); setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
 }
 window.onload=initialize;
 
