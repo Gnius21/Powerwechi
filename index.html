@@ -849,7 +849,19 @@
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost</span>
                     </div>
-                    <div class="flex gap-1 h-28 items-end" id="chart7Bars"></div>
+                    <div class="flex gap-2">
+                        <div class="flex flex-col justify-between text-[9px] text-white/30 tabular-nums h-44 py-0.5 text-right" style="width:26px">
+                            <span>10</span><span>5</span><span>0</span>
+                        </div>
+                        <div class="flex-1 relative h-44">
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                <div class="border-t border-white/[0.06]"></div>
+                                <div class="border-t border-white/[0.06]"></div>
+                                <div class="border-t border-white/[0.06]"></div>
+                            </div>
+                            <div class="flex gap-1 h-full items-end relative" id="chart7Bars"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -881,7 +893,19 @@
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-400 inline-block"></span>Import</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400 inline-block"></span>Cost</span>
                     </div>
-                    <div class="flex gap-px h-24 items-end" id="chart30Bars"></div>
+                    <div class="flex gap-2">
+                        <div class="flex flex-col justify-between text-[9px] text-white/30 tabular-nums h-44 py-0.5 text-right" style="width:26px">
+                            <span>10</span><span>5</span><span>0</span>
+                        </div>
+                        <div class="flex-1 relative h-44">
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                <div class="border-t border-white/[0.06]"></div>
+                                <div class="border-t border-white/[0.06]"></div>
+                                <div class="border-t border-white/[0.06]"></div>
+                            </div>
+                            <div class="flex gap-px h-full items-end relative" id="chart30Bars"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1471,12 +1495,11 @@ function renderStatsToday(){
     }
 }
 
+const CHART_SCALE_KWH=10; // fixed y-axis ceiling so daily bars are comparable
+const kwhH=v=>Math.max(2,Math.min(100,(v||0)/CHART_SCALE_KWH*100));
 function renderChart7(){
     const days=statsData.slice(-7);
-    const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
-    const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
-    const maxUse=Math.max(...days.map(d=>d.total_kwh||0),1);
     const total7sol=days.reduce((a,d)=>a+d.solar_kwh,0);
     const total7cost=days.reduce((a,d)=>a+d.cost_xcg,0);
     const total7use=days.reduce((a,d)=>a+(d.total_kwh||0),0);
@@ -1488,9 +1511,9 @@ function renderChart7(){
         const isToday=d.date===new Date().toDateString();
         const col=document.createElement("div");
         col.className="chart-col";
-        const sh=Math.max(2,d.solar_kwh/maxSol*100);
-        const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
-        const uh=Math.max(2,(d.total_kwh||0)/maxUse*100);
+        const sh=kwhH(d.solar_kwh);
+        const ih=kwhH(d.import_kwh);
+        const uh=kwhH(d.total_kwh);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const dayLabel=new Date(d.date).toLocaleDateString('en-US',{weekday:'short'});
         col.innerHTML=`<div class="chart-bars h-full items-end">
@@ -1506,10 +1529,7 @@ function renderChart7(){
 
 function renderChart30(){
     const days=statsData.slice(-30);
-    const maxSol=Math.max(...days.map(d=>d.solar_kwh),1);
     const maxCost=Math.max(...days.map(d=>Math.abs(d.cost_xcg)),0.1);
-    const maxImp=Math.max(...days.map(d=>d.import_kwh||0),0.1);
-    const maxUse=Math.max(...days.map(d=>d.total_kwh||0),1);
     const total=days.reduce((a,d)=>({sol:a.sol+d.solar_kwh,cost:a.cost+d.cost_xcg}),{sol:0,cost:0});
     document.getElementById("st30Solar").innerText=total.sol.toFixed(0)+" kWh";
     document.getElementById("st30Cost").innerText=total.cost.toFixed(1)+" XCG";
@@ -1520,9 +1540,9 @@ function renderChart30(){
     const c=document.getElementById("chart30Bars");c.innerHTML="";
     days.forEach(d=>{
         const isToday=d.date===new Date().toDateString();
-        const sh=Math.max(2,d.solar_kwh/maxSol*100);
-        const uh=Math.max(2,(d.total_kwh||0)/maxUse*100);
-        const ih=Math.max(2,(d.import_kwh||0)/maxImp*100);
+        const sh=kwhH(d.solar_kwh);
+        const uh=kwhH(d.total_kwh);
+        const ih=kwhH(d.import_kwh);
         const ch=Math.max(2,Math.abs(d.cost_xcg)/maxCost*100);
         const col=document.createElement("div");col.className="chart-col";
         col.innerHTML=`<div class="chart-bars h-full items-end">
