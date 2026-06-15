@@ -909,11 +909,12 @@ function saveWeatherCache(data,src){
 function loadWeatherCache(){
     try{
         const c=JSON.parse(localStorage.getItem('wxCache'));
-        if(c&&c.data&&c.data.temp_c!==null&&(Date.now()-c.ts)<20*60*1000){
+        if(c&&c.data&&c.data.temp_c!==null){
             knmiData=c.data;_wxSrc=c.src||'cached';
             applyKnmiUI(c.data,_wxSrc);
-            setKnmiStatus("ok",_wxSrc);
-            return true;
+            const age=Math.round((Date.now()-c.ts)/60000);
+            setKnmiStatus("ok",(c.src||'Weather')+(age>5?' ('+age+'m ago)':''));
+            return (Date.now()-c.ts)<20*60*1000; // return true if fresh (skip re-fetch)
         }
     }catch(e){}
     return false;
@@ -1667,8 +1668,8 @@ function update(){
 async function initialize(){
     // Kick off the weather network request FIRST so it races in parallel
     // with the rest of setup instead of waiting behind it.
-    loadWeatherCache();        // show last known weather instantly (if fresh)
-    fetchKnmi();               // start live fetch immediately
+    loadWeatherCache(); // show any cached data instantly (even stale)
+    fetchKnmi();        // always start a fresh fetch in parallel
     setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
 
     loadSettings(); // user system config first so derived values are ready
@@ -1705,7 +1706,12 @@ async function _requestWakeLock(){
     if(!('wakeLock' in navigator))return;
     try{ _wakeLock=await navigator.wakeLock.request('screen'); _wakeLock.addEventListener('release',()=>{_wakeLock=null;}); }catch(e){}
 }
-document.addEventListener('visibilitychange',async()=>{ if(document.visibilityState==='visible'&&!_wakeLock)await _requestWakeLock(); });
+document.addEventListener('visibilitychange',async()=>{
+    if(document.visibilityState==='visible'){
+        if(!_wakeLock)await _requestWakeLock();
+        fetchKnmi(); // refresh radiation & weather whenever app comes to foreground
+    }
+});
 _requestWakeLock();
 
 // Install prompt (Android Chrome shows a banner; iOS shows manual instructions)
