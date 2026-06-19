@@ -1083,6 +1083,7 @@ let actualDailySolarKwh=null; // user-entered actual solar production for stats
 let actualDailyImportKwh=null; // user-entered actual import for stats
 let actualDailyUsageKwh=null;  // user-entered actual total usage for stats
 let _autoSavedDate=null;       // tracks which day the 6pm auto-save already ran
+let _runningDay=new Date().toDateString(); // day the live counters belong to
 let knmiData=null, manualSolarW=null, manualSolarTime=null;
 let solarHistory=new Array(20).fill(0);
 let statsData=[];
@@ -1148,8 +1149,8 @@ function archiveDaySnapshot(date,solar,ac,imp,exp){
     if(statsData.length>30)statsData.splice(0,statsData.length-30);
     try{localStorage.setItem("powerStats",JSON.stringify(statsData));}catch(e){}
 }
-function saveStats(){
-    const today=new Date().toDateString();
+function saveStats(dateStr){
+    const today=dateStr||new Date().toDateString();
     const solarVal=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
     const importVal=actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh;
     const estUsage=dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY;
@@ -1264,6 +1265,22 @@ function checkEveningAutoSave(){
     const now=new Date();
     const localHour=((now.getUTCHours()-4)+24)%24+now.getUTCMinutes()/60;
     if(localHour>=18)eveningAutoSave();
+}
+
+// ── Midnight rollover: the app stays open continuously (wake lock), so the
+// clock crosses midnight while running. Finalize the day that just ended and
+// reset the running counters so today doesn't inherit yesterday's totals. ──
+function checkDayRollover(){
+    const today=new Date().toDateString();
+    if(_runningDay===today)return;
+    saveStats(_runningDay); // commit the finished day's final snapshot
+    dailySolarKwh=0; dailyAcKwh=0; dailyImportKwh=0; dailyExportKwh=0;
+    actualDailySolarKwh=null; actualDailyImportKwh=null; actualDailyUsageKwh=null;
+    _autoSavedDate=null;
+    const du=document.getElementById("dailyUsageInput"); if(du)du.dataset.manual="";
+    _runningDay=today;
+    saveState();
+    updateSolarDaily(); updateDailyImport(); updateDailyUsage();
 }
 function previewSelfSufficiency(){
     const uVal=parseFloat(document.getElementById("dailyUsageInput").value);
@@ -1586,6 +1603,7 @@ function updateIndoor(out,ac){
    MAIN UPDATE TICK
 ═══════════════════════════════════════════════════════ */
 function update(){
+    checkDayRollover(); // reset daily counters when the clock passes midnight
     const out=outdoorFeelsLike(),sol=solar(),ac=acPower(indoor,out);
     const fridge=fridgePower(),other=OTHER_BASE_W+Math.floor(Math.random()*10);
     updateIndoor(out,ac);
