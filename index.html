@@ -199,6 +199,10 @@
                     class="hidden w-9 h-9 rounded-2xl flex items-center justify-center text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 transition-all border border-emerald-400/30">
                 <i class="fas fa-download text-sm"></i>
             </button>
+            <button id="notifBtn" onclick="requestNotifications()" title="Enable evening reminder"
+                    class="hidden w-9 h-9 rounded-2xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all border border-white/10">
+                <i class="fas fa-bell text-sm"></i>
+            </button>
             <button onclick="openSettings()" title="System settings"
                     class="w-9 h-9 rounded-2xl flex items-center justify-center text-white/55 hover:text-white hover:bg-white/10 transition-all border border-white/10">
                 <i class="fas fa-gear"></i>
@@ -765,6 +769,38 @@
                 <div class="mt-3 rounded-xl px-3 py-2 flex items-center justify-between" style="background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.15)">
                     <span class="text-[10px] text-white/35 tracking-widest">⚡ SELF-SUFFICIENCY</span>
                     <span id="stTodaySelfSuf" class="text-[13px] font-bold text-emerald-400">— %</span>
+                </div>
+
+                <!-- Projected full-day estimate -->
+                <div class="mt-3 rounded-2xl p-3" style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18)">
+                    <div class="text-[10px] text-purple-300/70 tracking-widest mb-2 flex items-center gap-1.5">
+                        <i class="fas fa-wand-magic-sparkles text-[9px]"></i>
+                        PROJECTED FULL DAY
+                        <span id="projAcTag" class="ml-auto text-[9px] text-white/25"></span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div>
+                            <div class="text-[11px] font-bold text-emerald-400 tabular-nums" id="projSolar">—</div>
+                            <div class="text-[9px] text-white/30 mt-0.5">Solar</div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-orange-400 tabular-nums" id="projUsage">—</div>
+                            <div class="text-[9px] text-white/30 mt-0.5">Usage</div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-red-400 tabular-nums" id="projImport">—</div>
+                            <div class="text-[9px] text-white/30 mt-0.5">Import</div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-bold text-emerald-300 tabular-nums" id="projExport">—</div>
+                            <div class="text-[9px] text-white/30 mt-0.5">Export</div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-center text-[10px] text-white/30">
+                        Cost ~<span id="projCost" class="text-yellow-400 font-semibold">—</span> XCG
+                        <span class="mx-1.5 text-white/15">·</span>
+                        <span id="projSelfSuf" class="text-emerald-400 font-semibold">—</span> self-sufficient
+                    </div>
                 </div>
 
                 <!-- Daily meter readings for stats override -->
@@ -1510,6 +1546,20 @@ function renderStatsToday(){
         const dCost=cost-yest.cost_xcg;
         document.getElementById("stTodayCostVsYest").innerHTML=(dCost<=0?'<span class="text-emerald-400">↓ -':'<span class="text-red-400">↑ +')+Math.abs(dCost).toFixed(2)+" XCG</span> vs yesterday";
     }
+    // Projected full day — uses AC profile daily estimate for usage, KNMI solar for full-day PV
+    const projSol=actualDailySolarKwh!==null?actualDailySolarKwh:Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5));
+    const projUsage=actualDailyUsageKwh!==null?actualDailyUsageKwh:(acMode?AC_PROFILES[setpoint].dailyKwh:0.2)+FRIDGE_DAILY+OTHER_DAILY;
+    const projImp=actualDailyImportKwh!==null?actualDailyImportKwh:Math.max(0,projUsage-projSol);
+    const projExp=Math.max(0,projSol-projUsage);
+    const projCostVal=projImp*RATE-projExp*EXPORT_RATE;
+    const projSS=projUsage>0?Math.min(100,Math.round((projUsage-projImp)/projUsage*100)):100;
+    document.getElementById("projSolar").innerText=projSol.toFixed(1)+" kWh";
+    document.getElementById("projUsage").innerText=projUsage.toFixed(1)+" kWh";
+    document.getElementById("projImport").innerText=projImp.toFixed(1)+" kWh";
+    document.getElementById("projExport").innerText=projExp.toFixed(1)+" kWh";
+    document.getElementById("projCost").innerText=projCostVal.toFixed(2);
+    document.getElementById("projSelfSuf").innerText=projSS+"%";
+    document.getElementById("projAcTag").innerText=acMode?"AC ON "+setpoint+"°C":"AC OFF";
 }
 
 const CHART_SCALE_KWH=10; // fixed y-axis ceiling so daily bars are comparable
@@ -1695,6 +1745,58 @@ function update(){
 }
 
 /* ═══════════════════════════════════════════════════════
+   NOTIFICATIONS (iOS 16.4+ PWA supports Web Push)
+═══════════════════════════════════════════════════════ */
+let _notifEnabled=false;
+
+function initNotifBtn(){
+    if(!('Notification' in window))return;
+    const btn=document.getElementById("notifBtn");
+    if(Notification.permission==='granted'){
+        _notifEnabled=true;
+        if(btn){btn.classList.remove("hidden");btn.title="Notifications on";btn.querySelector("i").className="fas fa-bell text-sm text-emerald-400";}
+        scheduleEveningNotif();
+    } else if(Notification.permission!=='denied'){
+        if(btn)btn.classList.remove("hidden");
+    }
+}
+
+async function requestNotifications(){
+    if(!('Notification' in window)){
+        alert("Notifications are not supported in this browser.\n\nOn iPhone, make sure the app is added to your Home Screen and you're running iOS 16.4 or later.");
+        return;
+    }
+    const perm=await Notification.requestPermission();
+    const btn=document.getElementById("notifBtn");
+    if(perm==='granted'){
+        _notifEnabled=true;
+        if(btn){btn.title="Notifications on";btn.querySelector("i").className="fas fa-bell text-sm text-emerald-400";}
+        scheduleEveningNotif();
+        new Notification("PowerDash",{body:"Evening reminders enabled — you'll get a nudge at 6 PM to log meter readings.",icon:"./icon.svg"});
+    } else {
+        if(btn){btn.title="Notifications blocked";btn.querySelector("i").className="fas fa-bell-slash text-sm text-red-400/70";}
+    }
+}
+
+let _notifTimer=null;
+function scheduleEveningNotif(){
+    if(_notifTimer)clearTimeout(_notifTimer);
+    const now=new Date();
+    const localH=((now.getUTCHours()-4)+24)%24+now.getUTCMinutes()/60;
+    // ms until 18:05 local (5 min after 6pm auto-save, so there's data to log)
+    let msUntil=((18.0833-localH+24)%24)*3600000;
+    if(msUntil<60000)msUntil+=24*3600000; // already past — schedule tomorrow
+    _notifTimer=setTimeout(()=>{
+        if(Notification.permission==='granted'){
+            const sol=(actualDailySolarKwh??dailySolarKwh).toFixed(1);
+            const imp=(actualDailyImportKwh??dailyImportKwh).toFixed(1);
+            new Notification("PowerDash — Evening Summary",{body:`☀️ Solar ${sol} kWh · ↓ Import ${imp} kWh\nTime to log your meter readings.`,icon:"./icon.svg",tag:"evening-summary",renotify:false});
+        }
+        scheduleEveningNotif(); // reschedule for tomorrow
+    },msUntil);
+}
+
+/* ═══════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════ */
 async function initialize(){
@@ -1716,6 +1818,7 @@ async function initialize(){
     buildHistBars();
     updateClock(); setInterval(updateClock,1000);
     update(); setInterval(update,1200);
+    initNotifBtn();
     setInterval(()=>{saveState();saveStats();checkEveningAutoSave();},10000);
 }
 // Script is at end of <body>, so DOM is already parsed — run now instead of
