@@ -1305,15 +1305,15 @@ function eveningAutoSave(){
     _autoSavedDate=today;
     let changed=false;
     if(actualDailyUsageKwh===null){
-        actualDailyUsageKwh=+Math.max(0,dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY).toFixed(2);
+        actualDailyUsageKwh=+Math.max(0,dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY).toFixed(1);
         changed=true;
     }
     if(actualDailySolarKwh===null&&dailySolarKwh>0.05){
-        actualDailySolarKwh=+dailySolarKwh.toFixed(2);
+        actualDailySolarKwh=+dailySolarKwh.toFixed(1);
         changed=true;
     }
     if(actualDailyImportKwh===null&&dailyImportKwh>0.01){
-        actualDailyImportKwh=+dailyImportKwh.toFixed(2);
+        actualDailyImportKwh=+dailyImportKwh.toFixed(1);
         changed=true;
     }
     saveState(); saveStats();
@@ -1687,12 +1687,16 @@ function acPower(ind,out){
     return Math.min(MAX_AC,Math.max(220,Math.floor(l)));
 }
 function fridgePower(){
-    const c=(Date.now()%1200000)/1200000,r=c<FRIDGE_DUTY;
-    return{w:r?FRIDGE_RUN_W+Math.floor(Math.random()*8):FRIDGE_IDLE_W+Math.floor(Math.random()*3),running:r};
+    // Cycle every ~4 hours (240 minutes); compressor on for first FRIDGE_DUTY of that period
+    const now=Date.now();
+    const mins=Math.floor(now/60000);  // convert to minutes, stable across multiple calls
+    const cycle=(mins%240)/240;        // 0 to 1 over 4-hour window
+    const running=cycle<FRIDGE_DUTY;
+    return{w:running?FRIDGE_RUN_W+Math.floor(Math.random()*8):FRIDGE_IDLE_W+Math.floor(Math.random()*3),running};
 }
 function updateIndoor(out,ac){
     indoor+=(out-indoor)*0.032-(acMode?ac*0.0034:0.8);
-    if(acMode&&indoor<setpoint)indoor=setpoint+Math.random()*0.15;
+    // Clamp to physical limits; don't artificially oscillate around setpoint
     indoor=Math.max(18,Math.min(42,indoor));
 }
 
