@@ -240,6 +240,11 @@
                     <div class="text-[10px] text-white/30 mt-1">What the utility credits you for exported solar (0 if none).</div>
                 </div>
                 <div>
+                    <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>❄️</span>AC peak power (W)</label>
+                    <input id="setAcPeak" type="number" min="300" step="50" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
+                    <div class="text-[10px] text-white/30 mt-1">Rated/running wattage of your AC unit. Scales all AC load &amp; cost estimates (≈1280 W for a small split, ≈2500 W for a large one).</div>
+                </div>
+                <div>
                     <label class="text-xs text-white/55 mb-1.5 flex items-center gap-1.5"><span>🧊</span>Fridge running power (W)</label>
                     <input id="setFridge" type="number" min="20" step="5" class="solar-input rounded-xl px-3 py-2.5 text-sm w-full">
                     <div class="text-[10px] text-white/30 mt-1">Compressor draw while running (check the label or a plug meter).</div>
@@ -254,6 +259,20 @@
                     <i class="fas fa-check mr-1"></i>Save
                 </button>
                 <button onclick="closeSettings()" aria-label="Cancel" class="px-5 py-2.5 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">Cancel</button>
+            </div>
+
+            <!-- Data utilities -->
+            <div class="mt-5 pt-4 border-t border-white/[0.08]">
+                <div class="text-[10px] text-white/35 tracking-widest mb-2.5">DATA</div>
+                <div class="flex gap-2">
+                    <button onclick="exportStatsCSV()" aria-label="Export stats as CSV" class="flex-1 px-3 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-white/70 hover:bg-white/10 transition-all border border-white/10">
+                        <i class="fas fa-file-csv mr-1.5 text-emerald-400"></i>Export CSV
+                    </button>
+                    <button onclick="resetToday()" aria-label="Reset today's counters" class="flex-1 px-3 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-white/70 hover:bg-white/10 transition-all border border-white/10">
+                        <i class="fas fa-rotate-left mr-1.5 text-amber-400"></i>Reset Today
+                    </button>
+                </div>
+                <div class="text-[10px] text-white/25 mt-1.5">Export downloads your 30-day history. Reset zeroes today's running counters and clears manual entries.</div>
             </div>
         </div>
     </div>
@@ -1077,21 +1096,29 @@ function knmiToNormalized(p){
 /* ═══════════════════════════════════════════════════════
    SETTINGS — configurable, persisted to localStorage
 ═══════════════════════════════════════════════════════ */
-const MAX_AC=1280, FRIDGE_IDLE_W=45, FRIDGE_DUTY=0.35, OTHER_BASE_W=42;
-const AC_PROFILES={26:{base:560,dailyKwh:7.4},27:{base:480,dailyKwh:6.1},28:{base:420,dailyKwh:5.0}};
+const FRIDGE_IDLE_W=45, FRIDGE_DUTY=0.35, OTHER_BASE_W=42;
+// Reference AC model at a rated peak of 1280 W. Real units are scaled from
+// these ratios using the user's configured AC peak power (MAX_AC).
+const AC_REF_PEAK=1280;
+const AC_REF={26:{base:560,dailyKwh:7.4},27:{base:480,dailyKwh:6.1},28:{base:420,dailyKwh:5.0}};
 
 // User-configurable (defaults below). Mutated by the Settings panel.
 let RATE=0.68;          // import price XCG/kWh
 let EXPORT_RATE=0.27;   // feed-in credit XCG/kWh
 let MAX_SOLAR=920;      // panel peak W
 let FRIDGE_RUN_W=150;   // fridge compressor running W
+let MAX_AC=1280;        // AC peak/rated power W
 
 // Derived — recomputed whenever settings change
-let PANEL_EFF, FRIDGE_DAILY, OTHER_DAILY;
+let PANEL_EFF, FRIDGE_DAILY, OTHER_DAILY, AC_PROFILES={};
 function recomputeDerived(){
     PANEL_EFF=MAX_SOLAR/1000*0.82;
     FRIDGE_DAILY=(FRIDGE_RUN_W*FRIDGE_DUTY+FRIDGE_IDLE_W*(1-FRIDGE_DUTY))*24/1000;
     OTHER_DAILY=OTHER_BASE_W*24/1000;
+    // Scale the AC steady-state power and daily-kWh estimates to the user's unit
+    const f=MAX_AC/AC_REF_PEAK;
+    AC_PROFILES={};
+    [26,27,28].forEach(t=>{AC_PROFILES[t]={base:Math.round(AC_REF[t].base*f),dailyKwh:+(AC_REF[t].dailyKwh*f).toFixed(1)};});
 }
 function loadSettings(){
     try{
@@ -1101,6 +1128,7 @@ function loadSettings(){
             if(s.EXPORT_RATE>=0)EXPORT_RATE=s.EXPORT_RATE;
             if(s.MAX_SOLAR>0)MAX_SOLAR=s.MAX_SOLAR;
             if(s.FRIDGE_RUN_W>0)FRIDGE_RUN_W=s.FRIDGE_RUN_W;
+            if(s.MAX_AC>0)MAX_AC=s.MAX_AC;
         }
     }catch(e){}
     recomputeDerived();
@@ -1111,7 +1139,8 @@ function saveSettings(){
     EXPORT_RATE=Math.max(0,parseFloat(document.getElementById("setExport").value)||0);
     MAX_SOLAR=Math.max(100,parseFloat(document.getElementById("setPeak").value)||MAX_SOLAR);
     FRIDGE_RUN_W=Math.max(20,parseFloat(document.getElementById("setFridge").value)||FRIDGE_RUN_W);
-    try{localStorage.setItem("powerSettings",JSON.stringify({RATE,EXPORT_RATE,MAX_SOLAR,FRIDGE_RUN_W}));}catch(e){}
+    MAX_AC=Math.max(300,parseFloat(document.getElementById("setAcPeak").value)||MAX_AC);
+    try{localStorage.setItem("powerSettings",JSON.stringify({RATE,EXPORT_RATE,MAX_SOLAR,FRIDGE_RUN_W,MAX_AC}));}catch(e){}
     recomputeDerived();
     // Refresh derived labels
     const pl=document.getElementById("solarPeakLabel"); if(pl)pl.innerText=MAX_SOLAR+" W";
@@ -1127,6 +1156,7 @@ function openSettings(){
     document.getElementById("setExport").value=EXPORT_RATE;
     document.getElementById("setPeak").value=MAX_SOLAR;
     document.getElementById("setFridge").value=FRIDGE_RUN_W;
+    document.getElementById("setAcPeak").value=MAX_AC;
     document.getElementById("settingsOverlay").classList.remove("hidden");
 }
 function closeSettings(){ document.getElementById("settingsOverlay").classList.add("hidden"); }
@@ -1341,6 +1371,35 @@ function checkDayRollover(){
     saveState();
     updateSolarDaily(); updateDailyImport(); updateDailyUsage(); updateDailyExport();
 }
+
+// ── Data utilities ──
+function exportStatsCSV(){
+    saveStats(); // make sure today's row reflects the latest before export
+    const cols=['date','solar_kwh','total_kwh','import_kwh','export_kwh','ac_kwh','fridge_kwh','other_kwh','cost_xcg'];
+    const rows=[cols.join(',')];
+    statsData.forEach(d=>rows.push(cols.map(c=>d[c]!==undefined&&d[c]!==null?d[c]:'').join(',')));
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='powerdash-stats-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function resetToday(){
+    if(!confirm("Reset today's data?\n\nThis zeroes today's running counters and clears any manual solar/usage/import/export entries for today. History for previous days is kept."))return;
+    dailySolarKwh=0; dailyAcKwh=0; dailyImportKwh=0; dailyExportKwh=0;
+    actualDailySolarKwh=null; actualDailyImportKwh=null; actualDailyUsageKwh=null; actualDailyExportKwh=null;
+    manualSolarW=null; manualSolarTime=null;
+    const du=document.getElementById("dailyUsageInput"); if(du)du.dataset.manual="";
+    // Drop today's snapshot from history so it rebuilds clean
+    const today=new Date().toDateString();
+    const idx=statsData.findIndex(d=>d.date===today);
+    if(idx>=0)statsData.splice(idx,1);
+    saveState(); saveStats();
+    updateSolarDaily(); updateDailyImport(); updateDailyUsage(); updateDailyExport(); updateSolarSourceUI();
+    update();
+    closeSettings();
+}
 function previewSelfSufficiency(){
     const uVal=parseFloat(document.getElementById("dailyUsageInput").value);
     const iVal=parseFloat(document.getElementById("dailyImportInput").value);
@@ -1384,12 +1443,14 @@ function updateDailyExport(){
     updateExportAcOff();
 }
 function updateExportAcOff(){
-    // Calculate what export would be if AC was OFF: solar - (fridge+other) + import
-    const sol=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
-    const imp=actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh;
-    const expNoAc=Math.max(0,sol-(FRIDGE_DAILY+OTHER_DAILY)+imp);
+    // What you'd export over a FULL day with AC off: full-day solar minus the
+    // non-AC base loads (fridge + other). Uses a full-day solar projection so
+    // the figure is meaningful even early in the morning.
+    const fullDaySol=actualDailySolarKwh!==null?actualDailySolarKwh
+        :Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5));
+    const expNoAc=Math.max(0,fullDaySol-(FRIDGE_DAILY+OTHER_DAILY));
     const el=document.getElementById("exportIfAcOff");
-    if(el)el.innerText=`If AC OFF: ~${expNoAc.toFixed(1)} kWh export`;
+    if(el)el.innerText=`If AC off all day: ~${expNoAc.toFixed(1)} kWh export (full-day est.)`;
 }
 function updateSolarSourceUI(){
     const src=document.getElementById("solarSource"),info=document.getElementById("solarManualInfo");
@@ -1683,9 +1744,10 @@ function solar(){
 function acPower(ind,out){
     if(!acMode)return 8;
     const p=AC_PROFILES[setpoint];
-    let l=p.base+(out-ind)*68+(ind-setpoint)*45;
+    const f=MAX_AC/AC_REF_PEAK; // scale thermal response & floor to the unit's size
+    let l=p.base+(out-ind)*68*f+(ind-setpoint)*45*f;
     if(Math.abs(out-setpoint)<1.5&&Math.abs(ind-setpoint)<0.4)l=p.base*0.6;
-    return Math.min(MAX_AC,Math.max(220,Math.floor(l)));
+    return Math.min(MAX_AC,Math.max(220*f,Math.floor(l)));
 }
 function fridgePower(){
     // Cycle every ~4 hours (240 minutes); compressor on for first FRIDGE_DUTY of that period

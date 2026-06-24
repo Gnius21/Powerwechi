@@ -1,4 +1,4 @@
-const CACHE = 'powerdash-v17';
+const CACHE = 'powerdash-v18';
 const LOCAL_FILES = ['./', './index.html', './manifest.json', './icon.svg'];
 
 // ── Install: precache local app shell ──────────────────────────────────────
