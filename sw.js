@@ -1,4 +1,4 @@
-const CACHE = 'powerdash-v16';
+const CACHE = 'powerdash-v17';
 const LOCAL_FILES = ['./', './index.html', './manifest.json', './icon.svg'];
 
 // ── Install: precache local app shell ──────────────────────────────────────
@@ -23,8 +23,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
     const url = new URL(e.request.url);
 
-    // Never intercept KNMI or CORS proxy requests — always live
-    if (['knmi.nl','allorigins.win','r.jina.ai'].some(h => url.hostname.includes(h))) {
+    // Never intercept live weather/data requests — these must always hit the
+    // network so radiation & conditions are never served stale from cache.
+    // Covers Open-Meteo (primary) + every CORS proxy used by fetchKnmiPage.
+    const DATA_HOSTS = ['knmi.nl','open-meteo.com','corsproxy.io','allorigins.win','codetabs.com','r.jina.ai'];
+    if (DATA_HOSTS.some(h => url.hostname.includes(h))) {
         return;
     }
 

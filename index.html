@@ -1502,13 +1502,14 @@ function applyKnmiUI(d,src){
     const uvi=toUVI(d.radiation),ui=uviInfo(uvi);
     if(d.radiation!==null){
         document.getElementById("wxUvNum").innerText=uvi.toFixed(1);
-        document.getElementById("wxUvNum").className="text-[13px] font-bold tabular-nums "+ui.cls;
+        document.getElementById("wxUvNum").className="text-3xl font-bold tabular-nums "+ui.cls;
         document.getElementById("wxUvLabel").innerText=ui.lbl;
-        document.getElementById("wxUvLabel").className="text-[10px] font-semibold "+ui.cls;
+        document.getElementById("wxUvLabel").className="text-[11px] font-semibold "+ui.cls;
         document.getElementById("uvCursor").style.left=`calc(${Math.min(100,uvi/13*100).toFixed(1)}% - 6px)`;
-        document.getElementById("wxRadiation").innerText=d.radiation+" W/m²";
+        document.getElementById("wxRadiation").innerText=Math.round(d.radiation)+" W/m²";
     } else {
         document.getElementById("wxUvNum").innerText="—";
+        document.getElementById("wxUvNum").className="text-3xl font-bold text-green-400 tabular-nums";
         document.getElementById("wxUvLabel").innerText="—";
         document.getElementById("wxRadiation").innerText="— W/m²";
     }
