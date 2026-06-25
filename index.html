@@ -1049,7 +1049,7 @@ async function fetchOpenMeteo(){
             '&current=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,' +
             'wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,pressure_msl,shortwave_radiation' +
             '&wind_speed_unit=kn&timezone=America%2FCuracao&forecast_days=1';
-        const c=new AbortController(),t=setTimeout(()=>c.abort(),2000);
+        const c=new AbortController(),t=setTimeout(()=>c.abort(),3500);
         const r=await fetch(url,{signal:c.signal});clearTimeout(t);
         if(!r.ok)return null;
         const j=await r.json(),cur=j.current;
@@ -1502,6 +1502,7 @@ function buildRain(intensity){
 let _wxSrc='';
 
 // Prioritize Open-Meteo Curaçao (fast, reliable); fall back to KNMI Bonaire
+let _wxRetryTimer=null,_wxRetries=0;
 async function fetchKnmi(){
     setKnmiStatus("busy");
     const omP=fetchOpenMeteo().then(d=>{
@@ -1519,7 +1520,27 @@ async function fetchKnmi(){
         applyKnmiUI(res.data,res.src);
         setKnmiStatus("ok",res.src);
         saveWeatherCache(res.data,res.src);
-    }catch(e){setKnmiStatus("err");}
+        _wxRetries=0;
+        if(_wxRetryTimer){clearTimeout(_wxRetryTimer);_wxRetryTimer=null;}
+    }catch(e){
+        setKnmiStatus("err");
+        // Cold-start / flaky-network guard: a single failed attempt used to
+        // leave the app empty until the 5-min interval. Retry quickly with
+        // backoff (~1.5s,2.7s,4.9s,8.7s,15s) so data loads without the user
+        // having to close and reopen the app.
+        if(_wxRetries<5){
+            const delay=Math.min(15000,1500*Math.pow(1.8,_wxRetries));
+            _wxRetries++;
+            if(_wxRetryTimer)clearTimeout(_wxRetryTimer);
+            _wxRetryTimer=setTimeout(fetchKnmi,delay);
+        }
+    }
+}
+// User-initiated fetch (app open / foreground / interval): fresh retry budget.
+function kickWeather(){
+    _wxRetries=0;
+    if(_wxRetryTimer){clearTimeout(_wxRetryTimer);_wxRetryTimer=null;}
+    fetchKnmi();
 }
 function setKnmiStatus(s,src){
     document.getElementById("knmiDot").className="w-1.5 h-1.5 rounded-full inline-block "+(s==="ok"?"knmi-ok":s==="busy"?"knmi-busy pulse-dot":"knmi-err");
@@ -1917,8 +1938,8 @@ async function initialize(){
     // Kick off the weather network request FIRST so it races in parallel
     // with the rest of setup instead of waiting behind it.
     loadWeatherCache(); // show any cached data instantly (even stale)
-    fetchKnmi();        // always start a fresh fetch in parallel
-    setInterval(fetchKnmi,5*60*1000); // refresh every 5 min
+    kickWeather();      // fresh fetch with cold-start retry budget
+    setInterval(kickWeather,5*60*1000); // refresh every 5 min
 
     loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
@@ -1959,9 +1980,12 @@ async function _requestWakeLock(){
 document.addEventListener('visibilitychange',async()=>{
     if(document.visibilityState==='visible'){
         if(!_wakeLock)await _requestWakeLock();
-        fetchKnmi(); // refresh radiation & weather whenever app comes to foreground
+        kickWeather(); // refresh radiation & weather whenever app comes to foreground
     }
 });
+// iOS standalone PWAs also fire pageshow on resume (incl. from bfcache) —
+// belt-and-suspenders so a foreground always triggers a fresh load.
+window.addEventListener('pageshow',()=>{ if(document.visibilityState==='visible')kickWeather(); });
 _requestWakeLock();
 
 // Install prompt (Android Chrome shows a banner; iOS shows manual instructions)
