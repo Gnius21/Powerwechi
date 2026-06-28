@@ -1001,16 +1001,18 @@
    KNMI BONAIRE SCRAPER
 ═══════════════════════════════════════════════════════ */
 const KNMI_URL='https://www.knmidc.org/weather/bonaire/?Current';
+let _wxCacheTs=null; // timestamp of the weather data currently on screen
 
 // Race all 3 proxies in parallel — use whichever responds first (faster than sequential)
 function saveWeatherCache(data,src){
-    try{localStorage.setItem('wxCache',JSON.stringify({data,src,ts:Date.now()}));}catch(e){}
+    _wxCacheTs=Date.now();
+    try{localStorage.setItem('wxCache',JSON.stringify({data,src,ts:_wxCacheTs}));}catch(e){}
 }
 function loadWeatherCache(){
     try{
         const c=JSON.parse(localStorage.getItem('wxCache'));
         if(c&&c.data&&c.data.temp_c!==null){
-            knmiData=c.data;_wxSrc=c.src||'cached';
+            knmiData=c.data;_wxSrc=c.src||'cached';_wxCacheTs=c.ts;
             applyKnmiUI(c.data,_wxSrc);
             const age=Math.round((Date.now()-c.ts)/60000);
             setKnmiStatus("ok",(c.src||'Weather')+(age>5?' ('+age+'m ago)':''));
@@ -1493,10 +1495,6 @@ function buildRain(intensity){
 }
 
 /* ═══════════════════════════════════════════════════════
-   SOLAR POSITION CALCULATION
-═══════════════════════════════════════════════════════ */
-
-/* ═══════════════════════════════════════════════════════
    KNMI FETCH + UI
 ═══════════════════════════════════════════════════════ */
 let _wxSrc='';
@@ -1523,7 +1521,7 @@ async function fetchKnmi(){
         _wxRetries=0;
         if(_wxRetryTimer){clearTimeout(_wxRetryTimer);_wxRetryTimer=null;}
     }catch(e){
-        setKnmiStatus("err");
+        setKnmiFailStatus();
         // Cold-start / flaky-network guard: a single failed attempt used to
         // leave the app empty until the 5-min interval. Retry quickly with
         // backoff (~1.5s,2.7s,4.9s,8.7s,15s) so data loads without the user
@@ -1545,6 +1543,17 @@ function kickWeather(){
 function setKnmiStatus(s,src){
     document.getElementById("knmiDot").className="w-1.5 h-1.5 rounded-full inline-block "+(s==="ok"?"knmi-ok":s==="busy"?"knmi-busy pulse-dot":"knmi-err");
     document.getElementById("knmiTxt").innerText=s==="ok"?(src||'Weather')+' LIVE':s==="busy"?"Weather…":"No data";
+}
+// Fetch failed: if real (cached) data is still on screen, say so instead of a
+// contradictory "No data". Only show the red error when there's truly nothing.
+function setKnmiFailStatus(){
+    if(knmiData&&_wxCacheTs){
+        const age=Math.round((Date.now()-_wxCacheTs)/60000);
+        document.getElementById("knmiDot").className="w-1.5 h-1.5 rounded-full inline-block knmi-busy";
+        document.getElementById("knmiTxt").innerText="cached"+(age>0?' '+age+'m':'');
+    } else {
+        setKnmiStatus("err");
+    }
 }
 let _prevPressure=null;
 function applyKnmiUI(d,src){
