@@ -1166,7 +1166,7 @@ function closeSettings(){ document.getElementById("settingsOverlay").classList.a
 /* ═══════════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════════ */
-let acMode=true, setpoint=28, indoor=27.9;
+let acMode=true, setpoint=26, indoor=26.0;
 let dailySolarKwh=0, dailyAcKwh=0, dailyImportKwh=0, dailyExportKwh=0;
 let actualDailySolarKwh=null; // user-entered actual solar production for stats
 let actualDailyImportKwh=null; // user-entered actual import for stats
@@ -1189,7 +1189,7 @@ function loadState(){
     try{
         const s=JSON.parse(localStorage.getItem("powerDash"));if(!s)return;
         acMode=[true,false].includes(s.acMode)?s.acMode:true;
-        setpoint=[26,27,28].includes(s.setpoint)?s.setpoint:28;
+        setpoint=[26,27,28].includes(s.setpoint)?s.setpoint:26;
         if(s.day===new Date().toDateString()){
             // Same day — restore running counters
             dailySolarKwh=s.dailySolarKwh||0;dailyAcKwh=s.dailyAcKwh||0;
@@ -1788,8 +1788,17 @@ function fridgePower(){
     return{w:running?FRIDGE_RUN_W+Math.floor(Math.random()*8):FRIDGE_IDLE_W+Math.floor(Math.random()*3),running};
 }
 function updateIndoor(out,ac){
-    indoor+=(out-indoor)*0.032-(acMode?ac*0.0034:0.8);
-    // Clamp to physical limits; don't artificially oscillate around setpoint
+    if(acMode){
+        // Thermostat behaviour: the room converges toward the setpoint, sitting
+        // a touch above it when it's hotter outside (the AC can't pull it all
+        // the way down). This keeps the indoor reading at the AC's set temp
+        // instead of drifting to the clamp.
+        const target=setpoint+Math.max(0,out-setpoint)*0.04;
+        indoor+=(target-indoor)*0.12;
+    } else {
+        // AC off: room slowly drifts toward the outdoor feels-like temperature.
+        indoor+=(out-indoor)*0.05;
+    }
     indoor=Math.max(18,Math.min(42,indoor));
 }
 
