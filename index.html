@@ -1213,7 +1213,14 @@ function loadState(){
 function loadStats(){
     try{
         const s=JSON.parse(localStorage.getItem("powerStats"));
-        if(s&&Array.isArray(s)&&s.length>0){statsData=s;return;}
+        if(s&&Array.isArray(s)&&s.length>0){
+            // Backfill total_kwh on rows saved before it existed, so the
+            // Usage bar doesn't render as a 2px sliver for those days.
+            s.forEach(d=>{
+                if(d.total_kwh==null)d.total_kwh=+((d.ac_kwh||0)+(d.fridge_kwh||0)+(d.other_kwh||0)).toFixed(1);
+            });
+            statsData=s;return;
+        }
     }catch(e){}
     generateInitialStats();
 }
@@ -1227,13 +1234,13 @@ function generateInitialStats(){
         const total=ac+FRIDGE_DAILY+OTHER_DAILY;
         const net=total-sol;
         const imp=Math.max(0,net),exp=Math.max(0,-net);
-        statsData.push({date:d.toDateString(),solar_kwh:sol,import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:ac,fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)});
+        statsData.push({date:d.toDateString(),solar_kwh:sol,import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:ac,fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),total_kwh:+total.toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)});
     }
 }
 function archiveDaySnapshot(date,solar,ac,imp,exp){
     // Skip if already recorded
     if(statsData.find(d=>d.date===date))return;
-    const snap={date,solar_kwh:+solar.toFixed(1),import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:+ac.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)};
+    const snap={date,solar_kwh:+solar.toFixed(1),import_kwh:+imp.toFixed(1),export_kwh:+exp.toFixed(1),ac_kwh:+ac.toFixed(1),fridge_kwh:+FRIDGE_DAILY.toFixed(1),other_kwh:+OTHER_DAILY.toFixed(1),total_kwh:+(ac+FRIDGE_DAILY+OTHER_DAILY).toFixed(1),cost_xcg:+(imp*RATE-exp*EXPORT_RATE).toFixed(2)};
     statsData.push(snap);
     // Keep sorted oldest→newest, trim to 30
     statsData.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -1663,7 +1670,12 @@ function setStatsTab(tab){
 }
 
 function renderStatsToday(){
-    const yest=statsData.length>0?statsData[statsData.length-1]:null;
+    // saveStats() upserts TODAY's row into statsData every 10s, so the last
+    // element is usually today itself — look yesterday up by date instead.
+    const yd=new Date(); yd.setDate(yd.getDate()-1);
+    const todayStr=new Date().toDateString();
+    const yest=statsData.find(d=>d.date===yd.toDateString())
+        ||[...statsData].reverse().find(d=>d.date!==todayStr)||null;
     const solDisplay=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
     const impDisplay=actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh;
     const totDisplay=actualDailyUsageKwh!==null?actualDailyUsageKwh:(dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY);
