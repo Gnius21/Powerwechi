@@ -277,6 +277,74 @@
         </div>
     </div>
 
+    <!-- ═══ BILL REVIEW MODAL ═══ -->
+    <div id="billOverlay" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4"
+         style="background:rgba(3,6,14,0.75);backdrop-filter:blur(6px)" onclick="if(event.target===this)closeBillReview()">
+        <div class="card rounded-3xl p-5 w-full max-w-md card-accent-yellow" style="background:rgba(14,20,46,0.97);max-height:90vh;overflow-y:auto">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-file-invoice text-yellow-400"></i>
+                    <span class="text-base font-bold">Check the bill data</span>
+                </div>
+                <button onclick="closeBillReview()" class="text-white/40 hover:text-white text-lg w-7 h-7" aria-label="Close"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div id="billReviewNote" class="hidden mb-3 rounded-xl px-3 py-2 text-[11px] text-amber-300" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25)"></div>
+            <p class="text-[11px] text-white/40 mb-3 leading-relaxed">Compare with your receipt and correct anything that was misread before saving.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">Period start</label>
+                    <input id="billStart" type="text" inputmode="numeric" placeholder="05.05.2026" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">Period end</label>
+                    <input id="billEnd" type="text" inputmode="numeric" placeholder="03.06.2026" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">⬇️ Import (kWh)</label>
+                    <input id="billImp" type="number" min="0" step="1" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">⬆️ Solar export (kWh)</label>
+                    <input id="billExp" type="number" min="0" step="1" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">💧 Water (m³)</label>
+                    <input id="billWater" type="number" min="0" step="0.1" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">⚡ Electricity (XCG)</label>
+                    <input id="billCostElec" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">🌞 Solar credit (XCG)</label>
+                    <input id="billCredSolar" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">🔌 Panel tariff (XCG)</label>
+                    <input id="billCostPanel" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">💧 Water cost (XCG)</label>
+                    <input id="billCostWater" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div>
+                    <label class="text-[11px] text-white/55 mb-1 block">Meter rent (XCG)</label>
+                    <input id="billCostMeter" type="number" min="0" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+                <div class="col-span-2">
+                    <label class="text-[11px] text-white/55 mb-1 block">💰 Saldo Final — total to pay (XCG)</label>
+                    <input id="billTotal" type="number" step="0.01" class="solar-input rounded-xl px-3 py-2 text-sm w-full">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-5">
+                <button onclick="saveBillReview()" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-900 hover:opacity-90 transition-all" style="background:linear-gradient(to right,#fbbf24,#f59e0b)">
+                    <i class="fas fa-check mr-1"></i>Save bill
+                </button>
+                <button onclick="closeBillReview()" class="px-5 py-2.5 rounded-xl bg-white/10 text-sm font-semibold hover:bg-white/15 transition-all">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="max-w-7xl mx-auto px-4 py-5 space-y-4">
 
         <!-- AC CONTROLS -->
@@ -986,6 +1054,36 @@
             </div>
 
         </div><!-- /stats -->
+
+        <!-- ═══ AQUALECTRA BILLS ═══ -->
+        <div class="card rounded-3xl p-5 card-accent-yellow">
+            <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-file-invoice text-yellow-400"></i>
+                    <span class="text-[15px] font-bold">Aqualectra Bills</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="exportBillsCSV()" aria-label="Export bills as CSV"
+                            class="px-3 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-white/60 hover:bg-white/10 transition-all border border-white/10">
+                        <i class="fas fa-file-csv"></i>
+                    </button>
+                    <button onclick="addBillManually()" aria-label="Add bill manually"
+                            class="px-3 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-white/70 hover:bg-white/10 transition-all border border-white/10">
+                        <i class="fas fa-keyboard mr-1.5"></i>Manual
+                    </button>
+                    <button onclick="document.getElementById('billFile').click()" aria-label="Upload receipt photo"
+                            class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-900 hover:opacity-90 transition-all"
+                            style="background:linear-gradient(to right,#fbbf24,#f59e0b)">
+                        <i class="fas fa-camera mr-1.5"></i>Upload receipt
+                    </button>
+                </div>
+            </div>
+            <div class="text-[11px] text-white/35 mb-3">Photograph your bill — the numbers are read on your phone (nothing is sent anywhere), you confirm, and each month is stored below.</div>
+            <input id="billFile" type="file" accept="image/*" class="hidden" onchange="handleBillFile(this.files[0]);this.value=''">
+            <div id="billOcrStatus" class="hidden mb-3 rounded-xl px-3 py-2.5 text-[12px] font-semibold text-yellow-300 text-center" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25)"></div>
+            <div id="billInsights" class="hidden mb-3 rounded-xl px-3 py-2.5 text-[12px] text-white/60" style="background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.18)"></div>
+            <div id="billsList" class="space-y-2"></div>
+        </div>
 
     </div><!-- /container -->
 
@@ -1910,6 +2008,220 @@ function update(){
 }
 
 /* ═══════════════════════════════════════════════════════
+   AQUALECTRA BILLS — upload photo, on-device OCR, organize
+═══════════════════════════════════════════════════════ */
+let billsData=[];
+const BILL_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function loadBills(){try{const b=JSON.parse(localStorage.getItem('powerBills'));if(Array.isArray(b))billsData=b;}catch(e){}}
+function saveBills(){try{localStorage.setItem('powerBills',JSON.stringify(billsData));}catch(e){}}
+function parseBillDate(s){
+    const m=String(s||'').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if(!m)return null;
+    const d=new Date(+m[3],+m[2]-1,+m[1]);
+    return isNaN(d)?null:d;
+}
+function billPeriodKey(b){ // billing month = month of the period end date
+    const d=parseBillDate(b.dateEnd)||parseBillDate(b.dateStart);
+    return d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'):'unknown';
+}
+function billLabel(b){
+    const d=parseBillDate(b.dateEnd)||parseBillDate(b.dateStart);
+    return d?BILL_MONTHS[d.getMonth()]+' '+d.getFullYear():'Unknown period';
+}
+function billDays(b){
+    const a=parseBillDate(b.dateStart),z=parseBillDate(b.dateEnd);
+    return a&&z?Math.max(1,Math.round((z-a)/86400000)):30;
+}
+
+// ── Upload → OCR (runs entirely on the phone; the photo is never uploaded) ──
+function setBillStatus(html){
+    const el=document.getElementById('billOcrStatus');
+    if(html===null){el.classList.add('hidden');return;}
+    el.classList.remove('hidden'); el.innerHTML=html;
+}
+async function handleBillFile(file){
+    if(!file)return;
+    try{
+        setBillStatus('<i class="fas fa-circle-notch fa-spin mr-2"></i>Loading text recognition (first time only)…');
+        if(!window.Tesseract){
+            await new Promise((res,rej)=>{
+                const s=document.createElement('script');
+                s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+                s.onload=res; s.onerror=()=>rej(new Error('could not load the OCR library'));
+                document.head.appendChild(s);
+            });
+        }
+        const worker=await Tesseract.createWorker('eng',1,{logger:m=>{
+            if(m.status==='recognizing text')setBillStatus('<i class="fas fa-circle-notch fa-spin mr-2"></i>Reading receipt… '+Math.round(m.progress*100)+'%');
+        }});
+        const {data}=await worker.recognize(file);
+        await worker.terminate();
+        setBillStatus(null);
+        const parsed=parseAqualectra(data&&data.text||'');
+        openBillReview(parsed,parsed._found>=3?null:'Some fields could not be read from the photo — check and fill in what is missing.');
+    }catch(e){
+        setBillStatus(null);
+        openBillReview({},'Could not read the photo ('+(e&&e.message||'error')+'). Enter the values from the receipt manually.');
+    }
+}
+
+// Extract the Aqualectra fields from OCR text. Meter rows look like:
+//   Koriente J8D010734870 05.05.2026 5,579.00 03.06.2026 5,844.00 1.00 265.00 KWH 30 SU 01
+// Cost lines look like:  Konsumo Normal di Koriente kWh-L   XCG 157.49
+function parseAqualectra(text){
+    const lines=String(text).split('\n').map(l=>l.trim()).filter(Boolean);
+    const decs=s=>(s.match(/\d[\d,]*\.\d{2}/g)||[]).map(x=>parseFloat(x.replace(/,/g,'')));
+    const dates=s=>s.match(/\d{2}\.\d{2}\.\d{4}/g)||[];
+    const out={_found:0};
+    const grabRow=(re,keyKwh)=>{
+        for(const L of lines){
+            if(!re.test(L))continue;
+            const ds=dates(L),ns=decs(L.replace(/\d{2}\.\d{2}\.\d{4}/g,' '));
+            if(ds.length>=2&&ns.length>=2){
+                if(!out.dateStart){out.dateStart=ds[0];out.dateEnd=ds[1];}
+                const posI=ns[0],posF=ns[1];
+                let k=ns.length>=4?ns[3]:ns[ns.length-1];
+                // The meter positions are the ground truth; if the parsed
+                // consumption disagrees with end-start, trust the positions.
+                if(Math.abs((posF-posI)-k)>1.5)k=+(posF-posI).toFixed(2);
+                out[keyKwh]=k;out._found++;
+                return;
+            }
+        }
+    };
+    grabRow(/koriente/i,'impKwh');
+    grabRow(/zonnepanel/i,'expKwh');
+    grabRow(/\bawa\b/i,'waterM3');
+    const grabCost=(re,key)=>{
+        for(const L of lines){
+            if(!re.test(L))continue;
+            // Strip dd.mm.yyyy dates first ("Paga Prome Ku: 23.06.2026" sits on
+            // the Saldo Final line) so "23.06" is never mistaken for an amount.
+            const ns=decs(L.replace(/\d{2}\.\d{2}\.\d{4}/g,' '));
+            if(ns.length){out[key]=ns[ns.length-1];out._found++;return;}
+        }
+    };
+    grabCost(/koriente\s*kwh/i,'costElec');
+    grabCost(/entrega\s*energia/i,'credSolar');
+    grabCost(/kapasidat/i,'costPanel');
+    grabCost(/konsumo\s*normal\s*di\s*awa/i,'costWater');
+    grabCost(/hur\s*di\s*meter/i,'costMeter');
+    grabCost(/saldo\s*final/i,'total'); // first Saldo Final = electricity+water section
+    return out;
+}
+
+// ── Review modal ──
+const BILL_INPUT_IDS={dateStart:'billStart',dateEnd:'billEnd',impKwh:'billImp',expKwh:'billExp',waterM3:'billWater',costElec:'billCostElec',credSolar:'billCredSolar',costPanel:'billCostPanel',costWater:'billCostWater',costMeter:'billCostMeter',total:'billTotal'};
+let _billEditId=null;
+function openBillReview(p,note){
+    _billEditId=p&&p.id||null;
+    for(const f in BILL_INPUT_IDS)document.getElementById(BILL_INPUT_IDS[f]).value=(p&&p[f]!=null)?p[f]:'';
+    const n=document.getElementById('billReviewNote');
+    if(note){n.innerText=note;n.classList.remove('hidden');}else n.classList.add('hidden');
+    document.getElementById('billOverlay').classList.remove('hidden');
+}
+function closeBillReview(){document.getElementById('billOverlay').classList.add('hidden');_billEditId=null;}
+function addBillManually(){openBillReview({},null);}
+function editBill(id){const b=billsData.find(x=>x.id===id);if(b)openBillReview(b,null);}
+function saveBillReview(){
+    const b=(_billEditId?billsData.find(x=>x.id===_billEditId):null)||{};
+    for(const f in BILL_INPUT_IDS){
+        const v=document.getElementById(BILL_INPUT_IDS[f]).value.trim();
+        if(f==='dateStart'||f==='dateEnd')b[f]=v;
+        else{const n=parseFloat(v);b[f]=isFinite(n)?n:null;}
+    }
+    if(b.impKwh==null&&b.total==null){alert('Enter at least the imported kWh or the bill total.');return;}
+    if(!b.id){b.id=Date.now();b.ts=Date.now();}
+    b.period=billPeriodKey(b);
+    // Re-uploading the same month's bill replaces the earlier entry
+    const dup=billsData.findIndex(x=>x.period===b.period&&x.id!==b.id);
+    if(dup>=0)billsData.splice(dup,1);
+    if(!billsData.find(x=>x.id===b.id))billsData.push(b);
+    billsData.sort((a,z)=>a.period<z.period?-1:1);
+    saveBills();renderBills();closeBillReview();
+}
+function deleteBill(id){
+    const b=billsData.find(x=>x.id===id);
+    if(!b)return;
+    if(!confirm('Delete the '+billLabel(b)+' bill?'))return;
+    billsData=billsData.filter(x=>x.id!==id);
+    saveBills();renderBills();
+}
+
+// ── Apply the real rates from the newest bill to the app's cost settings ──
+function applyBillRates(){
+    const b=billsData[billsData.length-1];if(!b)return;
+    const r=b.costElec&&b.impKwh?b.costElec/b.impKwh:null;
+    const er=b.credSolar&&b.expKwh?b.credSolar/b.expKwh:null;
+    if(!r){alert('The latest bill is missing the electricity cost or kWh, so no rate can be calculated.');return;}
+    if(!confirm('Set import rate to '+r.toFixed(3)+' XCG/kWh'+(er?' and solar credit to '+er.toFixed(3)+' XCG/kWh':'')+', taken from your '+billLabel(b)+' bill?'))return;
+    RATE=+r.toFixed(3); if(er)EXPORT_RATE=+er.toFixed(3);
+    try{localStorage.setItem("powerSettings",JSON.stringify({RATE,EXPORT_RATE,MAX_SOLAR,FRIDGE_RUN_W,MAX_AC}));}catch(e){}
+    recomputeDerived();
+    const rl=document.getElementById("rateLabel"); if(rl)rl.innerText=RATE.toFixed(2)+" XCG/kWh";
+    renderBills();update();
+}
+
+function renderBills(){
+    const list=document.getElementById('billsList'),ins=document.getElementById('billInsights');
+    if(!list)return;
+    list.innerHTML='';
+    if(!billsData.length){
+        ins.classList.add('hidden');
+        list.innerHTML='<div class="text-[12px] text-white/35 text-center py-5">No bills saved yet. Tap <b class="text-yellow-300">Upload receipt</b> and photograph your Aqualectra bill.</div>';
+        return;
+    }
+    const latest=billsData[billsData.length-1];
+    const lr=latest.costElec&&latest.impKwh?latest.costElec/latest.impKwh:null;
+    const ler=latest.credSolar&&latest.expKwh?latest.credSolar/latest.expKwh:null;
+    if(lr){
+        ins.classList.remove('hidden');
+        ins.innerHTML='⚡ Your real rate from '+billLabel(latest)+': <b class="text-yellow-300">'+lr.toFixed(3)+' XCG/kWh</b>'
+            +(ler?' · solar credit <b class="text-emerald-300">'+ler.toFixed(3)+'</b>':'')
+            +(Math.abs(lr-RATE)>0.005?' — <button onclick="applyBillRates()" class="underline text-sky-300 font-semibold">use in app</button>':' — in use ✓');
+    } else ins.classList.add('hidden');
+    const newestFirst=[...billsData].reverse();
+    newestFirst.forEach((b,i)=>{
+        const prev=newestFirst[i+1];
+        const days=billDays(b);
+        const dImp=prev&&prev.impKwh!=null&&b.impKwh!=null?b.impKwh-prev.impKwh:null;
+        const row=document.createElement('div');
+        row.className='rounded-2xl p-3 bg-white/[0.04] border border-white/[0.07]';
+        row.innerHTML=`
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <span class="text-[14px] font-bold">${billLabel(b)}</span>
+                    <span class="text-[10px] text-white/30 ml-2">${b.dateStart||'?'} → ${b.dateEnd||'?'} · ${days}d</span>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="editBill(${b.id})" title="Edit bill" aria-label="Edit bill" class="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"><i class="fas fa-pen text-[11px]"></i></button>
+                    <button onclick="deleteBill(${b.id})" title="Delete bill" aria-label="Delete bill" class="w-7 h-7 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/10 transition-all"><i class="fas fa-trash text-[11px]"></i></button>
+                </div>
+            </div>
+            <div class="grid grid-cols-4 gap-2 text-center">
+                <div><div class="text-[13px] font-bold text-red-400 tabular-nums">${b.impKwh!=null?b.impKwh.toFixed(0):'—'}</div><div class="text-[9px] text-white/30">kWh in</div></div>
+                <div><div class="text-[13px] font-bold text-emerald-400 tabular-nums">${b.expKwh!=null?b.expKwh.toFixed(0):'—'}</div><div class="text-[9px] text-white/30">kWh out</div></div>
+                <div><div class="text-[13px] font-bold text-white/70 tabular-nums">${b.impKwh!=null?(b.impKwh/days).toFixed(1):'—'}</div><div class="text-[9px] text-white/30">kWh/day</div></div>
+                <div><div class="text-[13px] font-bold text-yellow-400 tabular-nums">${b.total!=null?b.total.toFixed(2):'—'}</div><div class="text-[9px] text-white/30">XCG total</div></div>
+            </div>
+            ${dImp!==null?`<div class="text-[10px] mt-2 ${dImp<=0?'text-emerald-400':'text-red-400'}">${dImp<=0?'↓':'↑'} ${Math.abs(dImp).toFixed(0)} kWh import vs previous bill</div>`:''}`;
+        list.appendChild(row);
+    });
+}
+function exportBillsCSV(){
+    if(!billsData.length){alert('No bills to export yet.');return;}
+    const cols=['period','dateStart','dateEnd','impKwh','expKwh','waterM3','costElec','credSolar','costPanel','costWater','costMeter','total'];
+    const rows=[cols.join(',')];
+    billsData.forEach(b=>rows.push(cols.map(c=>b[c]!=null?b[c]:'').join(',')));
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='aqualectra-bills.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/* ═══════════════════════════════════════════════════════
    NOTIFICATIONS (iOS 16.4+ PWA supports Web Push)
 ═══════════════════════════════════════════════════════ */
 let _notifEnabled=false;
@@ -1973,6 +2285,7 @@ async function initialize(){
 
     loadSettings(); // user system config first so derived values are ready
     loadStats(); loadState(); // stats must load first so archiveDaySnapshot has statsData ready
+    loadBills(); renderBills(); // Aqualectra bill history
     updateSolarDaily(); updateDailyImport(); updateDailyUsage(); updateDailyExport(); // init daily displays
     checkEveningAutoSave(); // catch case where app opened after 6 PM
     document.getElementById("solarManualInput").addEventListener("keydown",e=>{if(e.key==="Enter")applyManualSolar();});
