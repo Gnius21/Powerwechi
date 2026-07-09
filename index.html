@@ -1553,8 +1553,11 @@ function updateExportAcOff(){
     // What you'd export over a FULL day with AC off: full-day solar minus the
     // non-AC base loads (fridge + other). Uses a full-day solar projection so
     // the figure is meaningful even early in the morning.
+    const todayStr=new Date().toDateString();
+    const todayBill=findBillForDate(todayStr);
     const fullDaySol=actualDailySolarKwh!==null?actualDailySolarKwh
-        :Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5));
+        :(todayBill&&todayBill.dailySolarAvg!=null?todayBill.dailySolarAvg
+        :Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5)));
     const expNoAc=Math.max(0,fullDaySol-(FRIDGE_DAILY+OTHER_DAILY));
     const el=document.getElementById("exportIfAcOff");
     if(el)el.innerText=`If AC off all day: ~${expNoAc.toFixed(1)} kWh export (full-day est.)`;
@@ -1774,12 +1777,21 @@ function renderStatsToday(){
     const todayStr=new Date().toDateString();
     const yest=statsData.find(d=>d.date===yd.toDateString())
         ||[...statsData].reverse().find(d=>d.date!==todayStr)||null;
-    const solDisplay=actualDailySolarKwh!==null?actualDailySolarKwh:dailySolarKwh;
+
+    // Check if there's a bill covering today for calibration
+    const todayBill=findBillForDate(todayStr);
+
+    // Solar: prefer manual entry, then bill-calibrated average, then live
+    const solDisplay=actualDailySolarKwh!==null?actualDailySolarKwh
+        :(todayBill&&todayBill.dailySolarAvg!=null?todayBill.dailySolarAvg:dailySolarKwh);
+    // Import: prefer manual entry, then live
     const impDisplay=actualDailyImportKwh!==null?actualDailyImportKwh:dailyImportKwh;
-    const totDisplay=actualDailyUsageKwh!==null?actualDailyUsageKwh:(dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY);
+    // Usage: prefer manual entry, then bill-calibrated average, then live
+    const totDisplay=actualDailyUsageKwh!==null?actualDailyUsageKwh
+        :(todayBill&&todayBill.dailyUsageAvg!=null?todayBill.dailyUsageAvg:(dailyAcKwh+FRIDGE_DAILY+OTHER_DAILY));
     const expDisplay=actualDailyExportKwh!==null?actualDailyExportKwh:Math.max(0,solDisplay-totDisplay+impDisplay);
     const cost=+(impDisplay*RATE-expDisplay*EXPORT_RATE);
-    document.getElementById("stTodaySolar").innerText=solDisplay.toFixed(1)+" kWh"+(actualDailySolarKwh!==null?' ✓':'');
+    document.getElementById("stTodaySolar").innerText=solDisplay.toFixed(1)+" kWh"+(actualDailySolarKwh!==null?' ✓':'')+(todayBill&&todayBill.dailySolarAvg!=null&&actualDailySolarKwh==null?' ✓':'');
     document.getElementById("stTodayCost").innerText=cost.toFixed(2)+" XCG";
     document.getElementById("stTodayExport").innerText=expDisplay.toFixed(1)+" kWh"+(actualDailyExportKwh!==null?' ✓':'');
     document.getElementById("stTodayImport").innerText=impDisplay.toFixed(1)+" kWh"+(actualDailyImportKwh!==null?' ✓':'');
@@ -1796,8 +1808,13 @@ function renderStatsToday(){
         document.getElementById("stTodayCostVsYest").innerHTML=(dCost<=0?'<span class="text-emerald-400">↓ -':'<span class="text-red-400">↑ +')+Math.abs(dCost).toFixed(2)+" XCG</span> vs yesterday";
     }
     // Projected full day — uses AC profile daily estimate for usage, KNMI solar for full-day PV
-    const projSol=actualDailySolarKwh!==null?actualDailySolarKwh:Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5));
-    const projUsage=actualDailyUsageKwh!==null?actualDailyUsageKwh:(acMode?AC_PROFILES[setpoint].dailyKwh:0.2)+FRIDGE_DAILY+OTHER_DAILY;
+    // Prefer bill-calibrated values if available
+    const projSol=actualDailySolarKwh!==null?actualDailySolarKwh
+        :(todayBill&&todayBill.dailySolarAvg!=null?todayBill.dailySolarAvg
+        :Math.max(dailySolarKwh,(knmiData&&knmiData.radiation>0?(knmiData.radiation*MAX_SOLAR/1000*0.88*5.5/1000):3.5)));
+    const projUsage=actualDailyUsageKwh!==null?actualDailyUsageKwh
+        :(todayBill&&todayBill.dailyUsageAvg!=null?todayBill.dailyUsageAvg
+        :((acMode?AC_PROFILES[setpoint].dailyKwh:0.2)+FRIDGE_DAILY+OTHER_DAILY));
     const projImp=actualDailyImportKwh!==null?actualDailyImportKwh:Math.max(0,projUsage-projSol);
     const projExp=Math.max(0,projSol-projUsage);
     const projCostVal=projImp*RATE-projExp*EXPORT_RATE;
@@ -2012,7 +2029,18 @@ function update(){
 ═══════════════════════════════════════════════════════ */
 let billsData=[];
 const BILL_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function loadBills(){try{const b=JSON.parse(localStorage.getItem('powerBills'));if(Array.isArray(b))billsData=b;}catch(e){}}
+function loadBills(){
+    try{
+        const b=JSON.parse(localStorage.getItem('powerBills'));
+        if(Array.isArray(b)){
+            billsData=b;
+            // Backfill calibrated averages for any bills missing them
+            billsData.forEach(bill=>{
+                if(!bill.dailySolarAvg && !bill.dailyUsageAvg)calculateBillAverages(bill);
+            });
+        }
+    }catch(e){}
+}
 function saveBills(){try{localStorage.setItem('powerBills',JSON.stringify(billsData));}catch(e){}}
 function parseBillDate(s){
     const m=String(s||'').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
@@ -2031,6 +2059,25 @@ function billLabel(b){
 function billDays(b){
     const a=parseBillDate(b.dateStart),z=parseBillDate(b.dateEnd);
     return a&&z?Math.max(1,Math.round((z-a)/86400000)):30;
+}
+function calculateBillAverages(b){
+    const days=billDays(b);
+    if(!days||days<1)return;
+    // Daily export average = solar production (what was exported)
+    if(b.expKwh!=null)b.dailySolarAvg=+(b.expKwh/days).toFixed(1);
+    // Daily usage average = import minus export (net consumed from grid)
+    // Import is what came from grid; export is what went back; so usage = import - export
+    if(b.impKwh!=null&&b.expKwh!=null)b.dailyUsageAvg=+((b.impKwh-b.expKwh)/days).toFixed(1);
+}
+function findBillForDate(dateStr){
+    // Check which bill period (if any) covers the given date
+    for(const b of billsData){
+        const a=parseBillDate(b.dateStart),z=parseBillDate(b.dateEnd);
+        if(!a||!z)continue;
+        const d=new Date(dateStr);
+        if(d>=a&&d<=z)return b;
+    }
+    return null;
 }
 
 // ── Upload → OCR (runs entirely on the phone; the photo is never uploaded) ──
@@ -2138,6 +2185,8 @@ function saveBillReview(){
     if(dup>=0)billsData.splice(dup,1);
     if(!billsData.find(x=>x.id===b.id))billsData.push(b);
     billsData.sort((a,z)=>a.period<z.period?-1:1);
+    // Calculate and store daily averages from bill data for calibration
+    calculateBillAverages(b);
     saveBills();renderBills();closeBillReview();
 }
 function deleteBill(id){
